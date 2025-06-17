@@ -23,7 +23,8 @@ Commands:
 Options:
   --version          Show version information
   --help             Show this help message
-  --provider <name>  Use specific AI provider (openai, claude, ollama)"""
+  --provider <name>  Use specific AI provider (openai, claude, ollama)
+  --model <name>     Use specific model for the AI provider"""
     }
 
     private val configManager = ConfigManager()
@@ -35,8 +36,8 @@ Options:
             args.isEmpty() -> printHelp()
             command == "--version" -> printVersion()
             command == "--help" -> printHelp()
-            command == "test-connection" -> testConnection(options.provider)
-            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider)
+            command == "test-connection" -> testConnection(options.provider, options.model)
+            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model)
             else -> {
                 println("Unknown command: $command")
                 printHelp()
@@ -46,6 +47,7 @@ Options:
 
     private data class CommandOptions(
         val provider: AiProvider? = null,
+        val model: String? = null,
         val message: String = ""
     )
 
@@ -54,6 +56,7 @@ Options:
 
         var command = args[0]
         var provider: AiProvider? = null
+        var model: String? = null
         var message = ""
 
         var i = 1
@@ -76,6 +79,15 @@ Options:
                         return command to CommandOptions()
                     }
                 }
+                "--model" -> {
+                    if (i + 1 < args.size) {
+                        model = args[i + 1]
+                        i += 2
+                    } else {
+                        println("--model requires a value")
+                        return command to CommandOptions()
+                    }
+                }
                 else -> {
                     if (command == "ask") {
                         message = args.drop(i).joinToString(" ")
@@ -86,7 +98,7 @@ Options:
             }
         }
 
-        return command to CommandOptions(provider, message)
+        return command to CommandOptions(provider, model, message)
     }
 
     private fun printVersion() {
@@ -97,11 +109,15 @@ Options:
         println(HELP_TEXT)
     }
 
-    private fun testConnection(provider: AiProvider? = null) {
+    private fun testConnection(provider: AiProvider? = null, model: String? = null) {
         runBlocking {
             try {
                 val config = if (provider != null) {
-                    getProviderConfig(provider)
+                    var providerConfig = getProviderConfig(provider)
+                    if (model != null) {
+                        providerConfig = providerConfig.copy(model = model)
+                    }
+                    providerConfig
                 } else {
                     configManager.getCurrentProviderConfig()
                 }
@@ -110,6 +126,9 @@ Options:
 
                 if (result) {
                     println("✅ Connection to ${config.provider} successful!")
+                    if (model != null) {
+                        println("   Using model: $model")
+                    }
                 } else {
                     println("❌ Connection to ${config.provider} failed!")
                 }
@@ -119,11 +138,15 @@ Options:
         }
     }
 
-    private fun askQuestion(question: String, provider: AiProvider? = null) {
+    private fun askQuestion(question: String, provider: AiProvider? = null, model: String? = null) {
         runBlocking {
             try {
                 val config = if (provider != null) {
-                    getProviderConfig(provider)
+                    var providerConfig = getProviderConfig(provider)
+                    if (model != null) {
+                        providerConfig = providerConfig.copy(model = model)
+                    }
+                    providerConfig
                 } else {
                     configManager.getCurrentProviderConfig()
                 }
@@ -139,6 +162,9 @@ Options:
                 )
 
                 println("🤖 Asking ${config.provider}...")
+                if (model != null) {
+                    println("   Using model: $model")
+                }
                 val response = service.chat(request)
                 println("\n${response.content}")
                 println("\n📊 Usage: ${response.usage.totalTokens} tokens")

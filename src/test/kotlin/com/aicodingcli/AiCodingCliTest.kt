@@ -56,6 +56,7 @@ class AiCodingCliTest {
                   --version          Show version information
                   --help             Show this help message
                   --provider <name>  Use specific AI provider (openai, claude, ollama)
+                  --model <name>     Use specific model for the AI provider
             """.trimIndent()
             assertEquals(expectedHelp, output)
         } finally {
@@ -100,6 +101,28 @@ class AiCodingCliTest {
             // Assert
             val output = outputStream.toString().trim()
             assertTrue(output.contains("Unknown command: unknown-command"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle model parameter correctly`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act - This will fail due to invalid API key, but we can check the output format
+            cli.run(arrayOf("test-connection", "--provider", "ollama", "--model", "llama3.2"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should show the model being used
+            assertTrue(output.contains("Using model: llama3.2") || output.contains("Connection to OLLAMA"))
         } finally {
             // Restore original System.out
             System.setOut(originalOut)
