@@ -53,6 +53,7 @@ class AiCodingCliTest {
                   ask <message>      Ask AI a question
                   config <subcommand> Manage configuration settings
                   history <subcommand> Manage conversation history
+                  analyze <subcommand> Analyze code files and projects
 
                 Options:
                   --version          Show version information
