@@ -50,7 +50,7 @@ class QualityAnalyzer {
 
     private fun detectJvmLanguageIssues(code: String): List<CodeIssue> {
         val issues = mutableListOf<CodeIssue>()
-        
+
         // Check for bad class names
         val badClassNameRegex = Regex("class\\s+([a-z][a-zA-Z0-9]*)")
         badClassNameRegex.findAll(code).forEach { match ->
@@ -62,6 +62,45 @@ class QualityAnalyzer {
                 column = null,
                 suggestion = "Use PascalCase for class names (e.g., ${match.groupValues[1].replaceFirstChar { it.uppercase() }})"
             ))
+        }
+
+        // Check for bad method names (should be camelCase)
+        val badMethodNameRegex = Regex("fun\\s+([A-Z][a-zA-Z0-9]*|\\w*_\\w*)")
+        badMethodNameRegex.findAll(code).forEach { match ->
+            val methodName = match.groupValues[1]
+            issues.add(CodeIssue(
+                type = IssueType.NAMING_CONVENTION,
+                severity = IssueSeverity.MEDIUM,
+                message = "Method name '$methodName' should use camelCase",
+                line = findLineNumber(code, match.value),
+                column = null,
+                suggestion = "Use camelCase for method names"
+            ))
+        }
+
+        // Check for bad variable names
+        val badVariableNameRegex = Regex("(val|var)\\s+([A-Z][a-zA-Z0-9]*|\\w*_\\w*|[a-z])\\s*=")
+        badVariableNameRegex.findAll(code).forEach { match ->
+            val varName = match.groupValues[2]
+            if (varName.length == 1 && varName != "x" && varName != "y" && varName != "z") {
+                issues.add(CodeIssue(
+                    type = IssueType.NAMING_CONVENTION,
+                    severity = IssueSeverity.LOW,
+                    message = "Variable name '$varName' is too short",
+                    line = findLineNumber(code, match.value),
+                    column = null,
+                    suggestion = "Use descriptive variable names"
+                ))
+            } else if (varName.contains("_")) {
+                issues.add(CodeIssue(
+                    type = IssueType.NAMING_CONVENTION,
+                    severity = IssueSeverity.MEDIUM,
+                    message = "Variable name '$varName' should use camelCase instead of snake_case",
+                    line = findLineNumber(code, match.value),
+                    column = null,
+                    suggestion = "Use camelCase for variable names"
+                ))
+            }
         }
         
         // Check for unused variables (simplified)
@@ -81,11 +120,13 @@ class QualityAnalyzer {
             }
         }
         
-        // Check for magic numbers
+        // Check for magic numbers (avoid duplicates)
+        val magicNumbers = mutableSetOf<String>()
         val magicNumberRegex = Regex("\\b([0-9]{2,})\\b")
         magicNumberRegex.findAll(code).forEach { match ->
             val number = match.groupValues[1]
-            if (number != "100" && number != "1000") { // Common acceptable numbers
+            if (number != "100" && number != "1000" && !magicNumbers.contains(number)) { // Common acceptable numbers
+                magicNumbers.add(number)
                 issues.add(CodeIssue(
                     type = IssueType.CODE_SMELL,
                     severity = IssueSeverity.LOW,
@@ -96,7 +137,73 @@ class QualityAnalyzer {
                 ))
             }
         }
-        
+
+        // Check for security vulnerabilities
+        issues.addAll(detectSecurityIssues(code))
+
+        // Check for performance issues
+        issues.addAll(detectPerformanceIssues(code))
+
+        return issues
+    }
+
+    private fun detectSecurityIssues(code: String): List<CodeIssue> {
+        val issues = mutableListOf<CodeIssue>()
+
+        // SQL injection vulnerability
+        if (code.contains(Regex("\".*SELECT.*\\$\\{?\\w+\\}?.*\""))) {
+            issues.add(CodeIssue(
+                type = IssueType.SECURITY,
+                severity = IssueSeverity.HIGH,
+                message = "Potential SQL injection vulnerability",
+                line = findLineNumber(code, "SELECT"),
+                column = null,
+                suggestion = "Use parameterized queries or prepared statements"
+            ))
+        }
+
+        // Weak random number generation
+        if (code.contains("Math.random()")) {
+            issues.add(CodeIssue(
+                type = IssueType.SECURITY,
+                severity = IssueSeverity.MEDIUM,
+                message = "Weak random number generation",
+                line = findLineNumber(code, "Math.random()"),
+                column = null,
+                suggestion = "Use SecureRandom for cryptographic purposes"
+            ))
+        }
+
+        return issues
+    }
+
+    private fun detectPerformanceIssues(code: String): List<CodeIssue> {
+        val issues = mutableListOf<CodeIssue>()
+
+        // Inefficient string concatenation in loops (simplified detection)
+        if (code.contains("for") && code.contains("+=")) {
+            issues.add(CodeIssue(
+                type = IssueType.PERFORMANCE,
+                severity = IssueSeverity.MEDIUM,
+                message = "Inefficient string concatenation in loop",
+                line = findLineNumber(code, "+="),
+                column = null,
+                suggestion = "Use StringBuilder for string concatenation in loops"
+            ))
+        }
+
+        // Inefficient contains check
+        if (code.contains("contains(") && code.contains("for")) {
+            issues.add(CodeIssue(
+                type = IssueType.PERFORMANCE,
+                severity = IssueSeverity.LOW,
+                message = "Inefficient contains() check in loop",
+                line = findLineNumber(code, "contains("),
+                column = null,
+                suggestion = "Consider using Set for frequent contains() operations"
+            ))
+        }
+
         return issues
     }
 
@@ -206,14 +313,14 @@ class QualityAnalyzer {
             ProgrammingLanguage.PYTHON -> Regex("def\\s+\\w+")
             else -> Regex("function\\s+\\w+")
         }
-        
+
         publicMethodRegex.findAll(code).forEach { match ->
             val beforeMethod = code.substring(0, match.range.first)
             val lastLines = beforeMethod.lines().takeLast(3)
-            val hasDocumentation = lastLines.any { 
+            val hasDocumentation = lastLines.any {
                 it.trim().startsWith("/**") || it.trim().startsWith("\"\"\"") || it.trim().startsWith("//")
             }
-            
+
             if (!hasDocumentation) {
                 suggestions.add(Improvement(
                     type = ImprovementType.READABILITY,
@@ -222,6 +329,26 @@ class QualityAnalyzer {
                     priority = ImprovementPriority.LOW
                 ))
             }
+        }
+
+        // Check for poor error handling
+        if (code.contains("catch (e: Exception)") && code.contains("return \"\"")) {
+            suggestions.add(Improvement(
+                type = ImprovementType.SECURITY,
+                description = "Improve error handling - avoid returning empty strings on exceptions",
+                line = findLineNumber(code, "catch"),
+                priority = ImprovementPriority.MEDIUM
+            ))
+        }
+
+        // Check for dangerous null assertions
+        if (code.contains("!!")) {
+            suggestions.add(Improvement(
+                type = ImprovementType.SECURITY,
+                description = "Replace null assertion operator (!!) with safe calls or proper null checking",
+                line = findLineNumber(code, "!!"),
+                priority = ImprovementPriority.HIGH
+            ))
         }
         
         return suggestions
