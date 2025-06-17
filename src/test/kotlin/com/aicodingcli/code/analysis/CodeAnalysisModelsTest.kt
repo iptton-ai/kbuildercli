@@ -2,8 +2,8 @@ package com.aicodingcli.code.analysis
 
 import com.aicodingcli.code.common.ProgrammingLanguage
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class CodeAnalysisModelsTest {
 
