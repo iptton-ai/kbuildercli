@@ -55,6 +55,7 @@ class AiCodingCliTest {
                 Options:
                   --version          Show version information
                   --help             Show this help message
+                  --provider <name>  Use specific AI provider (openai, claude, gemini, ollama)
             """.trimIndent()
             assertEquals(expectedHelp, output)
         } finally {
