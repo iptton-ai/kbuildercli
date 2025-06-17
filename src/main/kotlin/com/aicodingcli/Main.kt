@@ -13,10 +13,24 @@ class AiCodingCli {
     fun run(args: Array<String>) {
         when {
             args.isNotEmpty() && args[0] == "--version" -> printVersion()
+            args.isNotEmpty() && args[0] == "--help" -> printHelp()
         }
     }
 
     private fun printVersion() {
         println(VERSION)
+    }
+
+    private fun printHelp() {
+        val helpText = """
+            AI Coding CLI - A command line tool for AI-assisted coding
+
+            Usage: ai-coding-cli [OPTIONS]
+
+            Options:
+              --version    Show version information
+              --help       Show this help message
+        """.trimIndent()
+        println(helpText)
     }
 }
