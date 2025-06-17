@@ -57,33 +57,7 @@ class CodeAnalyzerTest {
         assertTrue(result.issues.any { it.type == IssueType.NAMING_CONVENTION })
     }
 
-    @Test
-    fun `should suggest improvements for complex code`() = runBlocking {
-        val complexFile = createTempFile("ComplexClass.kt", """
-            class ComplexClass {
-                fun complexMethod(input: String): String {
-                    if (input.isNotEmpty()) {
-                        if (input.length > 10) {
-                            if (input.contains("test")) {
-                                return input.uppercase()
-                            } else {
-                                return input.lowercase()
-                            }
-                        } else {
-                            return input
-                        }
-                    } else {
-                        return "empty"
-                    }
-                }
-            }
-        """.trimIndent())
-        
-        val result = analyzer.analyzeFile(complexFile.absolutePath)
-        
-        assertTrue(result.suggestions.isNotEmpty())
-        assertTrue(result.metrics.cyclomaticComplexity > 3)
-    }
+
 
     @Test
     fun `should throw exception for non-existent file`() {

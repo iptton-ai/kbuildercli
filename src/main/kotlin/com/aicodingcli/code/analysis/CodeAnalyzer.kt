@@ -1,6 +1,8 @@
 package com.aicodingcli.code.analysis
 
 import com.aicodingcli.code.common.ProgrammingLanguage
+import com.aicodingcli.code.metrics.MetricsCalculator
+import com.aicodingcli.code.quality.QualityAnalyzer
 import java.io.File
 
 /**
@@ -33,6 +35,9 @@ interface CodeAnalyzer {
  */
 class DefaultCodeAnalyzer : CodeAnalyzer {
 
+    private val metricsCalculator = MetricsCalculator()
+    private val qualityAnalyzer = QualityAnalyzer()
+
     override suspend fun analyzeFile(filePath: String): CodeAnalysisResult {
         val file = File(filePath)
         if (!file.exists()) {
@@ -41,10 +46,10 @@ class DefaultCodeAnalyzer : CodeAnalyzer {
 
         val content = file.readText()
         val language = ProgrammingLanguage.fromFilePath(filePath)
-        
-        val metrics = calculateMetrics(content, language)
-        val issues = detectIssues(content, language)
-        val suggestions = suggestImprovements(content, language)
+
+        val metrics = metricsCalculator.calculateMetrics(content, language)
+        val issues = qualityAnalyzer.detectIssues(content, language)
+        val suggestions = qualityAnalyzer.suggestImprovements(content, language)
         val dependencies = extractDependencies(content, language)
 
         return CodeAnalysisResult(
@@ -78,90 +83,14 @@ class DefaultCodeAnalyzer : CodeAnalyzer {
     }
 
     override suspend fun detectIssues(code: String, language: ProgrammingLanguage): List<CodeIssue> {
-        val issues = mutableListOf<CodeIssue>()
-
-        // Basic naming convention checks
-        if (language == ProgrammingLanguage.KOTLIN || language == ProgrammingLanguage.JAVA) {
-            // Check for bad class names
-            if (code.contains(Regex("class\\s+[a-z]"))) {
-                issues.add(CodeIssue(
-                    type = IssueType.NAMING_CONVENTION,
-                    severity = IssueSeverity.MEDIUM,
-                    message = "Class names should start with uppercase letter",
-                    line = findLineNumber(code, "class\\s+[a-z]"),
-                    column = null,
-                    suggestion = "Use PascalCase for class names"
-                ))
-            }
-
-            // Check for unused variables (simple pattern)
-            if (code.contains(Regex("val\\s+\\w+\\s*=.*\\n(?!.*\\1)"))) {
-                issues.add(CodeIssue(
-                    type = IssueType.UNUSED_CODE,
-                    severity = IssueSeverity.LOW,
-                    message = "Unused variable detected",
-                    line = null,
-                    column = null,
-                    suggestion = "Remove unused variables"
-                ))
-            }
-        }
-
-        return issues
+        return qualityAnalyzer.detectIssues(code, language)
     }
 
     override suspend fun suggestImprovements(code: String, language: ProgrammingLanguage): List<Improvement> {
-        val suggestions = mutableListOf<Improvement>()
-
-        // Check for string concatenation in loops
-        if (code.contains(Regex("\\+\\s*=\\s*.*\\+\\s*"))) {
-            suggestions.add(Improvement(
-                type = ImprovementType.PERFORMANCE,
-                description = "Consider using StringBuilder for string concatenation",
-                line = findLineNumber(code, "\\+\\s*=\\s*.*\\+\\s*"),
-                priority = ImprovementPriority.MEDIUM
-            ))
-        }
-
-        // Check for complex nested conditions
-        val nestedIfCount = code.split("if").size - 1
-        if (nestedIfCount >= 3) {
-            suggestions.add(Improvement(
-                type = ImprovementType.MAINTAINABILITY,
-                description = "Consider extracting complex conditional logic into separate methods",
-                line = null,
-                priority = ImprovementPriority.HIGH
-            ))
-        }
-
-        return suggestions
+        return qualityAnalyzer.suggestImprovements(code, language)
     }
 
-    private fun calculateMetrics(code: String, language: ProgrammingLanguage): CodeMetrics {
-        val lines = code.lines()
-        val linesOfCode = lines.filter { it.trim().isNotEmpty() && !it.trim().startsWith("//") }.size
-        
-        // Simple cyclomatic complexity calculation
-        val complexityKeywords = listOf("if", "else", "while", "for", "when", "catch", "&&", "||")
-        val cyclomaticComplexity = complexityKeywords.sumOf { keyword ->
-            code.split(keyword).size - 1
-        } + 1 // Base complexity
 
-        // Mock maintainability index calculation
-        val maintainabilityIndex = when {
-            cyclomaticComplexity <= 5 -> 90.0
-            cyclomaticComplexity <= 10 -> 75.0
-            else -> 60.0
-        }
-
-        return CodeMetrics(
-            linesOfCode = linesOfCode,
-            cyclomaticComplexity = cyclomaticComplexity,
-            maintainabilityIndex = maintainabilityIndex,
-            testCoverage = null, // Would need external tool integration
-            duplicatedLines = 0 // Simplified for now
-        )
-    }
 
     private fun extractDependencies(code: String, language: ProgrammingLanguage): List<Dependency> {
         // Simplified dependency extraction
@@ -210,14 +139,5 @@ class DefaultCodeAnalyzer : CodeAnalyzer {
         )
     }
 
-    private fun findLineNumber(code: String, pattern: String): Int? {
-        val regex = Regex(pattern)
-        val lines = code.lines()
-        lines.forEachIndexed { index, line ->
-            if (regex.containsMatchIn(line)) {
-                return index + 1
-            }
-        }
-        return null
-    }
+
 }
