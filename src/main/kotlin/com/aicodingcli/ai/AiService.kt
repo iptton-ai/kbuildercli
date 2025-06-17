@@ -1,6 +1,7 @@
 package com.aicodingcli.ai
 
 import kotlinx.coroutines.flow.Flow
+import com.aicodingcli.ai.providers.OpenAiService as RealOpenAiService
 
 /**
  * AI service interface for different providers
@@ -37,7 +38,7 @@ object AiServiceFactory {
     fun createService(config: AiServiceConfig): AiService {
         // Configuration is already validated in AiServiceConfig.init
         return when (config.provider) {
-            AiProvider.OPENAI -> OpenAiService(config)
+            AiProvider.OPENAI -> RealOpenAiService(config)
             AiProvider.CLAUDE -> ClaudeService(config)
             AiProvider.GEMINI -> GeminiService(config)
             AiProvider.OLLAMA -> OllamaService(config)
