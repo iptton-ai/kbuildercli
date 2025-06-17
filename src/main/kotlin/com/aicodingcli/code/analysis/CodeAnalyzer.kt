@@ -110,7 +110,7 @@ class DefaultCodeAnalyzer : CodeAnalyzer {
         }
 
         val totalLoc = fileResults.sumOf { it.metrics.linesOfCode }
-        val avgComplexity = fileResults.map { it.metrics.cyclomaticComplexity }.average().toInt()
+        val avgComplexity = fileResults.map { it.metrics.cyclomaticComplexity.toDouble() }.average().toInt()
         val avgMaintainability = fileResults.map { it.metrics.maintainabilityIndex }.average()
 
         return CodeMetrics(
@@ -127,7 +127,7 @@ class DefaultCodeAnalyzer : CodeAnalyzer {
         val criticalIssues = fileResults.sumOf { result ->
             result.issues.count { it.severity == IssueSeverity.CRITICAL }
         }
-        val avgComplexity = fileResults.map { it.metrics.cyclomaticComplexity }.average()
+        val avgComplexity = fileResults.map { it.metrics.cyclomaticComplexity.toDouble() }.average()
         val avgMaintainability = fileResults.map { it.metrics.maintainabilityIndex }.average()
 
         return AnalysisSummary(

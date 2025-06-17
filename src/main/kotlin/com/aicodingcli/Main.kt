@@ -1081,7 +1081,7 @@ Options:
         // Display overall metrics
         println("📈 Overall Metrics:")
         println("  Total Lines of Code: ${result.overallMetrics.linesOfCode}")
-        println("  Average Complexity: ${"%.1f".format(result.overallMetrics.cyclomaticComplexity)}")
+        println("  Average Complexity: ${result.overallMetrics.cyclomaticComplexity}")
         println("  Average Maintainability: ${"%.1f".format(result.overallMetrics.maintainabilityIndex)}")
         println()
 
