@@ -54,6 +54,7 @@ class AiCodingCliTest {
                   config <subcommand> Manage configuration settings
                   history <subcommand> Manage conversation history
                   analyze <subcommand> Analyze code files and projects
+                  plugin <subcommand> Manage plugins
 
                 Options:
                   --version          Show version information
