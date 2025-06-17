@@ -7,6 +7,7 @@ import com.aicodingcli.history.HistorySearchCriteria
 import com.aicodingcli.history.MessageTokenUsage
 import com.aicodingcli.code.analysis.DefaultCodeAnalyzer
 import com.aicodingcli.code.common.ProgrammingLanguage
+import com.aicodingcli.plugins.*
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.time.Instant
@@ -18,6 +19,9 @@ fun main(args: Array<String>) {
     val cli = AiCodingCli()
     cli.run(args)
 }
+
+// Extension function for string repetition
+private operator fun String.times(n: Int): String = this.repeat(n)
 
 class AiCodingCli {
     companion object {
@@ -32,6 +36,7 @@ Commands:
   config <subcommand> Manage configuration settings
   history <subcommand> Manage conversation history
   analyze <subcommand> Analyze code files and projects
+  plugin <subcommand> Manage plugins
 
 Options:
   --version          Show version information
@@ -46,6 +51,11 @@ Options:
     private val configManager = ConfigManager()
     private val historyManager = HistoryManager()
     private val codeAnalyzer = DefaultCodeAnalyzer()
+    private val pluginManager = PluginManager(
+        configManager = configManager,
+        historyManager = historyManager,
+        aiServiceFactory = AiServiceFactory
+    )
 
     fun run(args: Array<String>) {
         val (command, options) = parseArgs(args)
@@ -59,6 +69,7 @@ Options:
             command == "config" -> handleConfigCommand(args.drop(1).toTypedArray())
             command == "history" -> handleHistoryCommand(args.drop(1).toTypedArray())
             command == "analyze" -> handleAnalyzeCommand(args.drop(1).toTypedArray())
+            command == "plugin" -> handlePluginCommand(args.drop(1).toTypedArray())
             else -> {
                 println("Unknown command: $command")
                 printHelp()
@@ -1184,6 +1195,361 @@ Options:
                     }
                 }
             }
+        }
+    }
+
+    private fun handlePluginCommand(args: Array<String>) {
+        if (args.isEmpty()) {
+            printPluginHelp()
+            return
+        }
+
+        when (args[0]) {
+            "list" -> handlePluginList(args.drop(1).toTypedArray())
+            "install" -> handlePluginInstall(args.drop(1).toTypedArray())
+            "uninstall" -> handlePluginUninstall(args.drop(1).toTypedArray())
+            "enable" -> handlePluginEnable(args.drop(1).toTypedArray())
+            "disable" -> handlePluginDisable(args.drop(1).toTypedArray())
+            "info" -> handlePluginInfo(args.drop(1).toTypedArray())
+            "validate" -> handlePluginValidate(args.drop(1).toTypedArray())
+            else -> {
+                println("Unknown plugin subcommand: ${args[0]}")
+                printPluginHelp()
+            }
+        }
+    }
+
+    private fun printPluginHelp() {
+        println("""
+            Plugin Management Commands:
+
+            plugin list                     List all installed plugins
+            plugin install <path-or-url>    Install a plugin from file or URL
+            plugin uninstall <plugin-id>    Uninstall a plugin
+            plugin enable <plugin-id>       Enable a plugin
+            plugin disable <plugin-id>      Disable a plugin
+            plugin info <plugin-id>         Show plugin information
+            plugin validate <plugin-path>   Validate a plugin file
+
+            Examples:
+            plugin list
+            plugin install ./my-plugin.jar
+            plugin install https://example.com/plugin.jar
+            plugin uninstall my-plugin-id
+            plugin info my-plugin-id
+            plugin validate ./my-plugin.jar
+        """.trimIndent())
+    }
+
+    private fun handlePluginList(args: Array<String>) {
+        try {
+            val loadedPlugins = pluginManager.getLoadedPlugins()
+            val discoveryService = PluginDiscoveryService(
+                System.getProperty("user.home") + "/.aicodingcli/plugins"
+            )
+            val availablePlugins = discoveryService.discoverPlugins()
+
+            if (loadedPlugins.isEmpty() && availablePlugins.isEmpty()) {
+                println("No plugins found.")
+                return
+            }
+
+            println("Plugin Status:")
+            println("=" * 60)
+
+            // Show loaded plugins
+            if (loadedPlugins.isNotEmpty()) {
+                println("\n✅ Loaded Plugins (${loadedPlugins.size}):")
+                loadedPlugins.forEach { plugin ->
+                    val state = pluginManager.getPluginState(plugin.metadata.id) ?: PluginState.UNLOADED
+                    println("  📦 ${plugin.metadata.name} (${plugin.metadata.id})")
+                    println("     Version: ${plugin.metadata.version}")
+                    println("     Author: ${plugin.metadata.author}")
+                    println("     State: $state")
+                    println("     Description: ${plugin.metadata.description}")
+
+                    when (plugin) {
+                        is CommandPlugin -> {
+                            println("     Type: Command Plugin")
+                            println("     Commands: ${plugin.commands.map { it.name }.joinToString(", ")}")
+                        }
+                        is AiServicePlugin -> {
+                            println("     Type: AI Service Plugin")
+                            println("     Provider: ${plugin.supportedProvider}")
+                        }
+                        else -> {
+                            println("     Type: Generic Plugin")
+                        }
+                    }
+                    println()
+                }
+            }
+
+            // Show available but not loaded plugins
+            val loadedIds = loadedPlugins.map { it.metadata.id }.toSet()
+            val unloadedPlugins = availablePlugins.filter { it.metadata.id !in loadedIds }
+
+            if (unloadedPlugins.isNotEmpty()) {
+                println("📋 Available Plugins (${unloadedPlugins.size}):")
+                unloadedPlugins.forEach { pluginInfo ->
+                    println("  📦 ${pluginInfo.metadata.name} (${pluginInfo.metadata.id})")
+                    println("     Version: ${pluginInfo.metadata.version}")
+                    println("     Author: ${pluginInfo.metadata.author}")
+                    println("     File: ${pluginInfo.filePath}")
+                    println("     Description: ${pluginInfo.metadata.description}")
+                    println()
+                }
+            }
+
+            // Show registry statistics
+            val stats = pluginManager.getRegistry().getStatistics()
+            println("📊 Plugin Statistics:")
+            println("  Total Plugins: ${stats.totalPlugins}")
+            println("  Command Plugins: ${stats.commandPlugins}")
+            println("  AI Service Plugins: ${stats.aiServicePlugins}")
+            println("  Total Commands: ${stats.totalCommands}")
+            if (stats.supportedAiProviders.isNotEmpty()) {
+                println("  Supported AI Providers: ${stats.supportedAiProviders.joinToString(", ")}")
+            }
+
+        } catch (e: Exception) {
+            println("❌ Error listing plugins: ${e.message}")
+        }
+    }
+
+    private fun handlePluginInstall(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin install <path-or-url>")
+            return
+        }
+
+        val pluginSource = args[0]
+
+        runBlocking {
+            try {
+                println("📦 Installing plugin from: $pluginSource")
+                val success = pluginManager.installPlugin(pluginSource)
+
+                if (success) {
+                    println("✅ Plugin installed successfully!")
+                } else {
+                    println("❌ Plugin installation failed!")
+                }
+            } catch (e: Exception) {
+                println("❌ Error installing plugin: ${e.message}")
+            }
+        }
+    }
+
+    private fun handlePluginUninstall(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin uninstall <plugin-id>")
+            return
+        }
+
+        val pluginId = args[0]
+
+        runBlocking {
+            try {
+                println("🗑️  Uninstalling plugin: $pluginId")
+                val success = pluginManager.uninstallPlugin(pluginId)
+
+                if (success) {
+                    println("✅ Plugin uninstalled successfully!")
+                } else {
+                    println("❌ Plugin not found or uninstall failed!")
+                }
+            } catch (e: Exception) {
+                println("❌ Error uninstalling plugin: ${e.message}")
+            }
+        }
+    }
+
+    private fun handlePluginEnable(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin enable <plugin-id>")
+            return
+        }
+
+        val pluginId = args[0]
+
+        // For now, this is equivalent to loading the plugin
+        // In a more advanced implementation, we might have enable/disable state
+        println("🔄 Loading plugin: $pluginId")
+
+        val discoveryService = PluginDiscoveryService(
+            System.getProperty("user.home") + "/.aicodingcli/plugins"
+        )
+        val availablePlugins = discoveryService.discoverPlugins()
+        val pluginInfo = availablePlugins.find { it.metadata.id == pluginId }
+
+        if (pluginInfo == null) {
+            println("❌ Plugin not found: $pluginId")
+            return
+        }
+
+        runBlocking {
+            try {
+                pluginManager.loadPlugin(pluginInfo.filePath)
+                println("✅ Plugin enabled successfully!")
+            } catch (e: Exception) {
+                println("❌ Error enabling plugin: ${e.message}")
+            }
+        }
+    }
+
+    private fun handlePluginDisable(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin disable <plugin-id>")
+            return
+        }
+
+        val pluginId = args[0]
+
+        runBlocking {
+            try {
+                println("⏸️  Disabling plugin: $pluginId")
+                val success = pluginManager.unloadPlugin(pluginId)
+
+                if (success) {
+                    println("✅ Plugin disabled successfully!")
+                } else {
+                    println("❌ Plugin not loaded or disable failed!")
+                }
+            } catch (e: Exception) {
+                println("❌ Error disabling plugin: ${e.message}")
+            }
+        }
+    }
+
+    private fun handlePluginInfo(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin info <plugin-id>")
+            return
+        }
+
+        val pluginId = args[0]
+
+        try {
+            // Try to get loaded plugin first
+            val loadedPlugin = pluginManager.getPlugin(pluginId)
+            if (loadedPlugin != null) {
+                displayPluginInfo(loadedPlugin, true)
+                return
+            }
+
+            // If not loaded, check available plugins
+            val discoveryService = PluginDiscoveryService(
+                System.getProperty("user.home") + "/.aicodingcli/plugins"
+            )
+            val availablePlugins = discoveryService.discoverPlugins()
+            val pluginInfo = availablePlugins.find { it.metadata.id == pluginId }
+
+            if (pluginInfo != null) {
+                displayPluginInfo(pluginInfo.metadata, false, pluginInfo.filePath)
+            } else {
+                println("❌ Plugin not found: $pluginId")
+            }
+
+        } catch (e: Exception) {
+            println("❌ Error getting plugin info: ${e.message}")
+        }
+    }
+
+    private fun displayPluginInfo(plugin: Plugin, isLoaded: Boolean) {
+        displayPluginInfo(plugin.metadata, isLoaded)
+    }
+
+    private fun displayPluginInfo(metadata: PluginMetadata, isLoaded: Boolean, filePath: String? = null) {
+        println("📦 Plugin Information")
+        println("=" * 50)
+        println("ID: ${metadata.id}")
+        println("Name: ${metadata.name}")
+        println("Version: ${metadata.version}")
+        println("Author: ${metadata.author}")
+        println("Description: ${metadata.description}")
+        println("Main Class: ${metadata.mainClass}")
+        println("Status: ${if (isLoaded) "✅ Loaded" else "📋 Available"}")
+
+        if (filePath != null) {
+            println("File: $filePath")
+        }
+
+        metadata.website?.let { website ->
+            println("Website: $website")
+        }
+
+        metadata.minCliVersion?.let { minVersion ->
+            println("Min CLI Version: $minVersion")
+        }
+
+        if (metadata.dependencies.isNotEmpty()) {
+            println("\nDependencies:")
+            metadata.dependencies.forEach { dep ->
+                val optional = if (dep.optional) " (optional)" else ""
+                println("  - ${dep.id} ${dep.version}$optional")
+            }
+        }
+
+        if (metadata.permissions.isNotEmpty()) {
+            println("\nPermissions:")
+            metadata.permissions.forEach { permission ->
+                when (permission) {
+                    is PluginPermission.FileSystemPermission -> {
+                        val access = if (permission.readOnly) "read-only" else "read-write"
+                        println("  - File System ($access): ${permission.allowedPaths.joinToString(", ")}")
+                    }
+                    is PluginPermission.NetworkPermission -> {
+                        println("  - Network: ${permission.allowedHosts.joinToString(", ")}")
+                    }
+                    is PluginPermission.SystemPermission -> {
+                        println("  - System Commands: ${permission.allowedCommands.joinToString(", ")}")
+                    }
+                    is PluginPermission.ConfigPermission -> {
+                        println("  - Configuration Access")
+                    }
+                    is PluginPermission.HistoryPermission -> {
+                        println("  - History Access")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handlePluginValidate(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: plugin validate <plugin-path>")
+            return
+        }
+
+        val pluginPath = args[0]
+
+        try {
+            println("🔍 Validating plugin: $pluginPath")
+            val result = pluginManager.validatePlugin(pluginPath)
+
+            if (result.isValid) {
+                println("✅ Plugin validation successful!")
+            } else {
+                println("❌ Plugin validation failed!")
+            }
+
+            if (result.errors.isNotEmpty()) {
+                println("\n🔴 Errors:")
+                result.errors.forEach { error ->
+                    println("  - $error")
+                }
+            }
+
+            if (result.warnings.isNotEmpty()) {
+                println("\n🟡 Warnings:")
+                result.warnings.forEach { warning ->
+                    println("  - $warning")
+                }
+            }
+
+        } catch (e: Exception) {
+            println("❌ Error validating plugin: ${e.message}")
         }
     }
 }
