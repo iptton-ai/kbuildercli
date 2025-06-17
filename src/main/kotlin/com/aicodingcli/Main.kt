@@ -19,6 +19,7 @@ Usage: ai-coding-cli [COMMAND] [OPTIONS]
 Commands:
   test-connection    Test connection to AI service
   ask <message>      Ask AI a question
+  config <subcommand> Manage configuration settings
 
 Options:
   --version          Show version information
@@ -38,6 +39,7 @@ Options:
             command == "--help" -> printHelp()
             command == "test-connection" -> testConnection(options.provider, options.model)
             command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model)
+            command == "config" -> handleConfigCommand(args.drop(1).toTypedArray())
             else -> {
                 println("Unknown command: $command")
                 printHelp()
@@ -208,6 +210,211 @@ Options:
                 temperature = 0.7f,
                 maxTokens = 1000
             )
+        }
+    }
+
+    private fun handleConfigCommand(args: Array<String>) {
+        if (args.isEmpty()) {
+            printConfigHelp()
+            return
+        }
+
+        when (args[0]) {
+            "set" -> handleConfigSet(args.drop(1).toTypedArray())
+            "get" -> handleConfigGet(args.drop(1).toTypedArray())
+            "list" -> handleConfigList()
+            "provider" -> handleConfigProvider(args.drop(1).toTypedArray())
+            else -> {
+                println("Unknown config subcommand: ${args[0]}")
+                printConfigHelp()
+            }
+        }
+    }
+
+    private fun printConfigHelp() {
+        println("""
+            Configuration Management Commands:
+
+            config set <key> <value>    Set a configuration value
+            config get <key>            Get a configuration value
+            config list                 List all configuration
+            config provider <name>      Set default AI provider
+
+            Examples:
+            config set openai.api_key sk-...
+            config set claude.api_key sk-ant-...
+            config get openai.api_key
+            config provider ollama
+            config list
+        """.trimIndent())
+    }
+
+    private fun handleConfigSet(args: Array<String>) {
+        if (args.size < 2) {
+            println("Usage: config set <key> <value>")
+            return
+        }
+
+        val key = args[0]
+        val value = args.drop(1).joinToString(" ")
+
+        runBlocking {
+            try {
+                setConfigValue(key, value)
+                println("✅ Configuration updated: $key")
+            } catch (e: Exception) {
+                println("❌ Error setting configuration: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleConfigGet(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: config get <key>")
+            return
+        }
+
+        val key = args[0]
+
+        runBlocking {
+            try {
+                val value = getConfigValue(key)
+                if (value != null) {
+                    // Mask sensitive values
+                    val displayValue = if (key.contains("api_key") || key.contains("apikey")) {
+                        maskApiKey(value)
+                    } else {
+                        value
+                    }
+                    println("$key = $displayValue")
+                } else {
+                    println("Configuration key '$key' not found")
+                }
+            } catch (e: Exception) {
+                println("❌ Error getting configuration: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleConfigList() {
+        runBlocking {
+            try {
+                val config = configManager.loadConfig()
+                println("Current Configuration:")
+                println("Default Provider: ${config.defaultProvider}")
+                println()
+
+                config.providers.forEach { (provider, providerConfig) ->
+                    println("[$provider]")
+                    println("  api_key = ${maskApiKey(providerConfig.apiKey)}")
+                    println("  model = ${providerConfig.model}")
+                    println("  base_url = ${providerConfig.baseUrl ?: "default"}")
+                    println("  temperature = ${providerConfig.temperature}")
+                    println("  max_tokens = ${providerConfig.maxTokens}")
+                    println()
+                }
+            } catch (e: Exception) {
+                println("❌ Error listing configuration: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleConfigProvider(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: config provider <name>")
+            println("Available providers: openai, claude, ollama")
+            return
+        }
+
+        val providerName = args[0].lowercase()
+        val provider = when (providerName) {
+            "openai" -> AiProvider.OPENAI
+            "claude" -> AiProvider.CLAUDE
+            "ollama" -> AiProvider.OLLAMA
+            else -> {
+                println("Unknown provider: $providerName")
+                println("Available providers: openai, claude, ollama")
+                return
+            }
+        }
+
+        runBlocking {
+            try {
+                configManager.setDefaultProvider(provider)
+                println("✅ Default provider set to: $provider")
+            } catch (e: Exception) {
+                println("❌ Error setting default provider: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun setConfigValue(key: String, value: String) {
+        val parts = key.split(".")
+        if (parts.size != 2) {
+            throw IllegalArgumentException("Key must be in format: provider.property (e.g., openai.api_key)")
+        }
+
+        val providerName = parts[0].lowercase()
+        val property = parts[1].lowercase()
+
+        val provider = when (providerName) {
+            "openai" -> AiProvider.OPENAI
+            "claude" -> AiProvider.CLAUDE
+            "ollama" -> AiProvider.OLLAMA
+            else -> throw IllegalArgumentException("Unknown provider: $providerName")
+        }
+
+        val config = configManager.loadConfig()
+        val currentProviderConfig = config.providers[provider] ?: createDefaultProviderConfig(provider)
+
+        val updatedConfig = when (property) {
+            "api_key", "apikey" -> currentProviderConfig.copy(apiKey = value)
+            "model" -> currentProviderConfig.copy(model = value)
+            "base_url", "baseurl" -> currentProviderConfig.copy(baseUrl = value)
+            "temperature" -> currentProviderConfig.copy(temperature = value.toFloatOrNull()
+                ?: throw IllegalArgumentException("Temperature must be a number"))
+            "max_tokens", "maxtokens" -> currentProviderConfig.copy(maxTokens = value.toIntOrNull()
+                ?: throw IllegalArgumentException("Max tokens must be a number"))
+            else -> throw IllegalArgumentException("Unknown property: $property")
+        }
+
+        configManager.updateProviderConfig(provider, updatedConfig)
+    }
+
+    private suspend fun getConfigValue(key: String): String? {
+        val parts = key.split(".")
+        if (parts.size != 2) {
+            return null
+        }
+
+        val providerName = parts[0].lowercase()
+        val property = parts[1].lowercase()
+
+        val provider = when (providerName) {
+            "openai" -> AiProvider.OPENAI
+            "claude" -> AiProvider.CLAUDE
+            "ollama" -> AiProvider.OLLAMA
+            else -> return null
+        }
+
+        val config = configManager.loadConfig()
+        val providerConfig = config.providers[provider] ?: return null
+
+        return when (property) {
+            "api_key", "apikey" -> providerConfig.apiKey
+            "model" -> providerConfig.model
+            "base_url", "baseurl" -> providerConfig.baseUrl
+            "temperature" -> providerConfig.temperature.toString()
+            "max_tokens", "maxtokens" -> providerConfig.maxTokens.toString()
+            else -> null
+        }
+    }
+
+    private fun maskApiKey(apiKey: String): String {
+        return if (apiKey.length > 8) {
+            "${apiKey.take(4)}${"*".repeat(apiKey.length - 8)}${apiKey.takeLast(4)}"
+        } else {
+            "*".repeat(apiKey.length)
         }
     }
 }
