@@ -42,7 +42,6 @@ object AiServiceFactory {
         return when (config.provider) {
             AiProvider.OPENAI -> RealOpenAiService(config)
             AiProvider.CLAUDE -> RealClaudeService(config)
-            AiProvider.GEMINI -> GeminiService(config)
             AiProvider.OLLAMA -> RealOllamaService(config)
         }
     }
@@ -90,89 +89,8 @@ class OpenAiService(config: AiServiceConfig) : BaseAiService(config) {
     }
 }
 
-/**
- * Claude service implementation (placeholder)
- */
-class ClaudeService(config: AiServiceConfig) : BaseAiService(config) {
-    override suspend fun chat(request: AiRequest): AiResponse {
-        validateRequest(request)
-        // TODO: Implement actual Claude API call
-        return AiResponse(
-            content = "Mock response from Claude",
-            model = request.model,
-            usage = TokenUsage(10, 5, 15),
-            finishReason = FinishReason.STOP
-        )
-    }
 
-    override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
-        validateRequest(request)
-        // TODO: Implement actual streaming
-        return kotlinx.coroutines.flow.flowOf(
-            AiStreamChunk("Mock response from Claude", FinishReason.STOP)
-        )
-    }
 
-    override suspend fun testConnection(): Boolean {
-        // TODO: Implement actual connection test
-        return true
-    }
-}
 
-/**
- * Gemini service implementation (placeholder)
- */
-class GeminiService(config: AiServiceConfig) : BaseAiService(config) {
-    override suspend fun chat(request: AiRequest): AiResponse {
-        validateRequest(request)
-        // TODO: Implement actual Gemini API call
-        return AiResponse(
-            content = "Mock response from Gemini",
-            model = request.model,
-            usage = TokenUsage(10, 5, 15),
-            finishReason = FinishReason.STOP
-        )
-    }
 
-    override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
-        validateRequest(request)
-        // TODO: Implement actual streaming
-        return kotlinx.coroutines.flow.flowOf(
-            AiStreamChunk("Mock response from Gemini", FinishReason.STOP)
-        )
-    }
 
-    override suspend fun testConnection(): Boolean {
-        // TODO: Implement actual connection test
-        return true
-    }
-}
-
-/**
- * Ollama service implementation (placeholder)
- */
-class OllamaService(config: AiServiceConfig) : BaseAiService(config) {
-    override suspend fun chat(request: AiRequest): AiResponse {
-        validateRequest(request)
-        // TODO: Implement actual Ollama API call
-        return AiResponse(
-            content = "Mock response from Ollama",
-            model = request.model,
-            usage = TokenUsage(10, 5, 15),
-            finishReason = FinishReason.STOP
-        )
-    }
-
-    override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
-        validateRequest(request)
-        // TODO: Implement actual streaming
-        return kotlinx.coroutines.flow.flowOf(
-            AiStreamChunk("Mock response from Ollama", FinishReason.STOP)
-        )
-    }
-
-    override suspend fun testConnection(): Boolean {
-        // TODO: Implement actual connection test
-        return true
-    }
-}

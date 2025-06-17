@@ -8,7 +8,6 @@ import kotlinx.serialization.Serializable
 enum class AiProvider {
     OPENAI,
     CLAUDE,
-    GEMINI,
     OLLAMA
 }
 

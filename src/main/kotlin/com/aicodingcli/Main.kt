@@ -23,7 +23,7 @@ Commands:
 Options:
   --version          Show version information
   --help             Show this help message
-  --provider <name>  Use specific AI provider (openai, claude, gemini, ollama)"""
+  --provider <name>  Use specific AI provider (openai, claude, ollama)"""
     }
 
     private val configManager = ConfigManager()
@@ -64,7 +64,6 @@ Options:
                         provider = when (args[i + 1].lowercase()) {
                             "openai" -> AiProvider.OPENAI
                             "claude" -> AiProvider.CLAUDE
-                            "gemini" -> AiProvider.GEMINI
                             "ollama" -> AiProvider.OLLAMA
                             else -> {
                                 println("Unknown provider: ${args[i + 1]}")
@@ -174,19 +173,12 @@ Options:
                 temperature = 0.7f,
                 maxTokens = 1000
             )
-            AiProvider.GEMINI -> AiServiceConfig(
-                provider = AiProvider.GEMINI,
-                apiKey = "your-gemini-api-key",
-                model = "gemini-pro",
-                baseUrl = "https://generativelanguage.googleapis.com/v1",
-                temperature = 0.7f,
-                maxTokens = 1000
-            )
+
             AiProvider.OLLAMA -> AiServiceConfig(
                 provider = AiProvider.OLLAMA,
-                apiKey = "",
+                apiKey = "not-required", // Ollama doesn't require API key but config validation needs non-empty string
                 model = "llama2",
-                baseUrl = "http://localhost:11434/api",
+                baseUrl = "http://localhost:11434",
                 temperature = 0.7f,
                 maxTokens = 1000
             )

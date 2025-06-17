@@ -86,12 +86,12 @@ class ConfigManagerTest {
     fun `should save configuration to file`() = runTest {
         // Arrange
         val config = AppConfig(
-            defaultProvider = AiProvider.GEMINI,
+            defaultProvider = AiProvider.CLAUDE,
             providers = mapOf(
-                AiProvider.GEMINI to com.aicodingcli.ai.AiServiceConfig(
-                    provider = AiProvider.GEMINI,
-                    apiKey = "test-gemini-key",
-                    model = "gemini-pro",
+                AiProvider.CLAUDE to com.aicodingcli.ai.AiServiceConfig(
+                    provider = AiProvider.CLAUDE,
+                    apiKey = "test-claude-key",
+                    model = "claude-3-sonnet",
                     temperature = 0.5f,
                     maxTokens = 1000
                 )
@@ -106,14 +106,14 @@ class ConfigManagerTest {
         assertTrue(configFile.exists())
         
         val savedConfig = configManager.loadConfig()
-        assertEquals(AiProvider.GEMINI, savedConfig.defaultProvider)
+        assertEquals(AiProvider.CLAUDE, savedConfig.defaultProvider)
         assertEquals(1, savedConfig.providers.size)
-        
-        val geminiConfig = savedConfig.providers[AiProvider.GEMINI]
-        assertNotNull(geminiConfig)
-        assertEquals("test-gemini-key", geminiConfig!!.apiKey)
-        assertEquals("gemini-pro", geminiConfig.model)
-        assertEquals(0.5f, geminiConfig.temperature)
+
+        val claudeConfig = savedConfig.providers[AiProvider.CLAUDE]
+        assertNotNull(claudeConfig)
+        assertEquals("test-claude-key", claudeConfig!!.apiKey)
+        assertEquals("claude-3-sonnet", claudeConfig.model)
+        assertEquals(0.5f, claudeConfig.temperature)
     }
 
     @Test
