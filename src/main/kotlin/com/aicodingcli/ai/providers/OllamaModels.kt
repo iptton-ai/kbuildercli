@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 data class OllamaRequest(
     val model: String,
     val messages: List<OllamaMessage>,
-    val stream: Boolean = false,
+    val stream: Boolean,
     val format: String? = null,
     val options: OllamaOptions? = null,
     @SerialName("keep_alive")
