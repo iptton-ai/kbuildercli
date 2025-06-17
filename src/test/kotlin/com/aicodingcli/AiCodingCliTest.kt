@@ -52,6 +52,7 @@ class AiCodingCliTest {
                   test-connection    Test connection to AI service
                   ask <message>      Ask AI a question
                   config <subcommand> Manage configuration settings
+                  history <subcommand> Manage conversation history
 
                 Options:
                   --version          Show version information
@@ -59,6 +60,8 @@ class AiCodingCliTest {
                   --provider <name>  Use specific AI provider (openai, claude, ollama)
                   --model <name>     Use specific model for the AI provider
                   --stream           Enable streaming response (real-time output)
+                  --continue <id>    Continue an existing conversation
+                  --new              Force start a new conversation
             """.trimIndent()
             assertEquals(expectedHelp, output)
         } finally {

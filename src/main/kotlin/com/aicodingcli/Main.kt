@@ -2,7 +2,14 @@ package com.aicodingcli
 
 import com.aicodingcli.ai.*
 import com.aicodingcli.config.ConfigManager
+import com.aicodingcli.history.HistoryManager
+import com.aicodingcli.history.HistorySearchCriteria
+import com.aicodingcli.history.MessageTokenUsage
 import kotlinx.coroutines.runBlocking
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 fun main(args: Array<String>) {
     val cli = AiCodingCli()
@@ -20,16 +27,20 @@ Commands:
   test-connection    Test connection to AI service
   ask <message>      Ask AI a question
   config <subcommand> Manage configuration settings
+  history <subcommand> Manage conversation history
 
 Options:
   --version          Show version information
   --help             Show this help message
   --provider <name>  Use specific AI provider (openai, claude, ollama)
   --model <name>     Use specific model for the AI provider
-  --stream           Enable streaming response (real-time output)"""
+  --stream           Enable streaming response (real-time output)
+  --continue <id>    Continue an existing conversation
+  --new              Force start a new conversation"""
     }
 
     private val configManager = ConfigManager()
+    private val historyManager = HistoryManager()
 
     fun run(args: Array<String>) {
         val (command, options) = parseArgs(args)
@@ -39,8 +50,9 @@ Options:
             command == "--version" -> printVersion()
             command == "--help" -> printHelp()
             command == "test-connection" -> testConnection(options.provider, options.model)
-            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model, options.stream)
+            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model, options.stream, options.continueConversationId, options.forceNew)
             command == "config" -> handleConfigCommand(args.drop(1).toTypedArray())
+            command == "history" -> handleHistoryCommand(args.drop(1).toTypedArray())
             else -> {
                 println("Unknown command: $command")
                 printHelp()
@@ -52,6 +64,8 @@ Options:
         val provider: AiProvider? = null,
         val model: String? = null,
         val stream: Boolean = false,
+        val continueConversationId: String? = null,
+        val forceNew: Boolean = false,
         val message: String = ""
     )
 
@@ -62,6 +76,8 @@ Options:
         var provider: AiProvider? = null
         var model: String? = null
         var stream = false
+        var continueConversationId: String? = null
+        var forceNew = false
         var message = ""
 
         var i = 1
@@ -97,6 +113,19 @@ Options:
                     stream = true
                     i++
                 }
+                "--continue" -> {
+                    if (i + 1 < args.size) {
+                        continueConversationId = args[i + 1]
+                        i += 2
+                    } else {
+                        println("--continue requires a conversation ID")
+                        return command to CommandOptions()
+                    }
+                }
+                "--new" -> {
+                    forceNew = true
+                    i++
+                }
                 else -> {
                     if (command == "ask") {
                         message = args.drop(i).joinToString(" ")
@@ -107,7 +136,7 @@ Options:
             }
         }
 
-        return command to CommandOptions(provider, model, stream, message)
+        return command to CommandOptions(provider, model, stream, continueConversationId, forceNew, message)
     }
 
     private fun printVersion() {
@@ -147,7 +176,14 @@ Options:
         }
     }
 
-    private fun askQuestion(question: String, provider: AiProvider? = null, model: String? = null, stream: Boolean = false) {
+    private fun askQuestion(
+        question: String,
+        provider: AiProvider? = null,
+        model: String? = null,
+        stream: Boolean = false,
+        continueConversationId: String? = null,
+        forceNew: Boolean = false
+    ) {
         runBlocking {
             try {
                 val config = if (provider != null) {
@@ -161,10 +197,60 @@ Options:
                 }
                 val service = AiServiceFactory.createService(config)
 
+                // Determine conversation to use
+                val conversation = when {
+                    continueConversationId != null -> {
+                        // User explicitly wants to continue a specific conversation
+                        val existing = historyManager.getConversation(continueConversationId)
+                        if (existing == null) {
+                            println("❌ Conversation not found: $continueConversationId")
+                            return@runBlocking
+                        }
+
+                        // Validate provider/model compatibility
+                        if (provider != null && existing.provider != config.provider) {
+                            println("⚠️  Warning: Switching provider from ${existing.provider} to ${config.provider}")
+                        }
+                        if (model != null && existing.model != config.model) {
+                            println("⚠️  Warning: Switching model from ${existing.model} to ${config.model}")
+                        }
+
+                        existing
+                    }
+                    forceNew -> {
+                        // User explicitly wants a new conversation
+                        createNewConversation(question, config)
+                    }
+                    else -> {
+                        // Smart conversation management: continue recent conversation if compatible
+                        val recentConversations = historyManager.getAllConversations().take(5)
+                        val compatibleConversation = recentConversations.find { conv ->
+                            conv.provider == config.provider &&
+                            conv.model == config.model &&
+                            conv.messages.isNotEmpty()
+                        }
+
+                        if (compatibleConversation != null) {
+                            println("🔄 Continuing conversation: ${compatibleConversation.title} (${compatibleConversation.id.take(8)})")
+                            compatibleConversation
+                        } else {
+                            createNewConversation(question, config)
+                        }
+                    }
+                }
+
+                // Add user message to history
+                historyManager.addMessage(
+                    conversationId = conversation.id,
+                    role = MessageRole.USER,
+                    content = question
+                )
+
+                // Build message history for context
+                val messages = buildMessageHistory(conversation, question)
+
                 val request = AiRequest(
-                    messages = listOf(
-                        AiMessage(role = MessageRole.USER, content = question)
-                    ),
+                    messages = messages,
                     model = config.model,
                     temperature = config.temperature,
                     maxTokens = config.maxTokens,
@@ -175,20 +261,30 @@ Options:
                 if (model != null) {
                     println("   Using model: $model")
                 }
+                if (messages.size > 1) {
+                    println("   Context: ${messages.size - 1} previous messages")
+                }
                 if (stream) {
                     println("   Streaming mode enabled")
                     println()
 
                     // Handle streaming response
-                    var totalTokens = 0
+                    val responseBuilder = StringBuilder()
                     service.streamChat(request).collect { chunk ->
                         print(chunk.content)
                         System.out.flush()
+                        responseBuilder.append(chunk.content)
 
                         if (chunk.finishReason != null) {
                             println("\n")
-                            // Note: Token usage might not be available in streaming mode for all providers
                             println("📊 Streaming response completed")
+
+                            // Add assistant response to history
+                            historyManager.addMessage(
+                                conversationId = conversation.id,
+                                role = MessageRole.ASSISTANT,
+                                content = responseBuilder.toString()
+                            )
                         }
                     }
                 } else {
@@ -196,11 +292,63 @@ Options:
                     val response = service.chat(request)
                     println("\n${response.content}")
                     println("\n📊 Usage: ${response.usage.totalTokens} tokens")
+
+                    // Add assistant response to history
+                    historyManager.addMessage(
+                        conversationId = conversation.id,
+                        role = MessageRole.ASSISTANT,
+                        content = response.content,
+                        tokenUsage = MessageTokenUsage(
+                            promptTokens = response.usage.promptTokens,
+                            completionTokens = response.usage.completionTokens,
+                            totalTokens = response.usage.totalTokens
+                        )
+                    )
                 }
+
+                println("\n💾 Conversation ID: ${conversation.id.take(8)} (${conversation.messages.size} messages)")
 
             } catch (e: Exception) {
                 println("❌ Error asking question: ${e.message}")
             }
+        }
+    }
+
+    private fun createNewConversation(question: String, config: AiServiceConfig) =
+        historyManager.createConversation(
+            title = generateConversationTitle(question),
+            provider = config.provider,
+            model = config.model
+        )
+
+    private fun buildMessageHistory(conversation: com.aicodingcli.history.ConversationSession, currentQuestion: String): List<AiMessage> {
+        val messages = mutableListOf<AiMessage>()
+
+        // Add previous messages (limit to last 10 to avoid token limits)
+        val recentMessages = conversation.messages.takeLast(10)
+        recentMessages.forEach { historyMessage ->
+            messages.add(AiMessage(
+                role = historyMessage.role,
+                content = historyMessage.content
+            ))
+        }
+
+        // Add current question
+        messages.add(AiMessage(
+            role = MessageRole.USER,
+            content = currentQuestion
+        ))
+
+        return messages
+    }
+
+    private fun generateConversationTitle(question: String): String {
+        // Generate a meaningful title from the question
+        val words = question.split(" ").take(5)
+        return if (words.size <= 5) {
+            question
+        } else {
+            "${words.joinToString(" ")}..."
         }
     }
 
@@ -444,4 +592,220 @@ Options:
             "*".repeat(apiKey.length)
         }
     }
+
+    private fun handleHistoryCommand(args: Array<String>) {
+        if (args.isEmpty()) {
+            printHistoryHelp()
+            return
+        }
+
+        when (args[0]) {
+            "list" -> handleHistoryList(args.drop(1).toTypedArray())
+            "show" -> handleHistoryShow(args.drop(1).toTypedArray())
+            "search" -> handleHistorySearch(args.drop(1).toTypedArray())
+            "delete" -> handleHistoryDelete(args.drop(1).toTypedArray())
+            "clear" -> handleHistoryClear()
+            "stats" -> handleHistoryStats()
+            else -> {
+                println("Unknown history subcommand: ${args[0]}")
+                printHistoryHelp()
+            }
+        }
+    }
+
+    private fun printHistoryHelp() {
+        println("""
+            Conversation History Management Commands:
+
+            history list [--limit N]        List recent conversations
+            history show <id>               Show conversation details
+            history search <query>          Search conversations
+            history delete <id>             Delete a conversation
+            history clear                   Clear all conversations
+            history stats                   Show history statistics
+
+            Examples:
+            history list --limit 10
+            history show abc123
+            history search "kotlin"
+            history delete abc123
+        """.trimIndent())
+    }
+
+    private fun handleHistoryList(args: Array<String>) {
+        var limit = 20
+
+        // Parse limit argument
+        var i = 0
+        while (i < args.size) {
+            when (args[i]) {
+                "--limit" -> {
+                    if (i + 1 < args.size) {
+                        limit = args[i + 1].toIntOrNull() ?: 20
+                        i += 2
+                    } else {
+                        println("--limit requires a value")
+                        return
+                    }
+                }
+                else -> i++
+            }
+        }
+
+        val conversations = historyManager.getAllConversations().take(limit)
+
+        if (conversations.isEmpty()) {
+            println("No conversation history found.")
+            return
+        }
+
+        println("Recent Conversations:")
+        println("=" * 60)
+
+        conversations.forEach { conversation ->
+            val date = formatTimestamp(conversation.updatedAt)
+            println("ID: ${conversation.id.take(8)}")
+            println("Title: ${conversation.title}")
+            println("Provider: ${conversation.provider} (${conversation.model})")
+            println("Updated: $date")
+            println("Messages: ${conversation.messages.size}")
+            println("Summary: ${conversation.getSummary()}")
+            println("-" * 40)
+        }
+    }
+
+    private fun handleHistoryShow(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: history show <conversation-id>")
+            return
+        }
+
+        val conversationId = args[0]
+        val conversation = historyManager.getConversation(conversationId)
+
+        if (conversation == null) {
+            println("Conversation not found: $conversationId")
+            return
+        }
+
+        println("Conversation: ${conversation.title}")
+        println("ID: ${conversation.id}")
+        println("Provider: ${conversation.provider} (${conversation.model})")
+        println("Created: ${formatTimestamp(conversation.createdAt)}")
+        println("Updated: ${formatTimestamp(conversation.updatedAt)}")
+        println("Messages: ${conversation.messages.size}")
+        println("=" * 60)
+
+        conversation.messages.forEach { message ->
+            val timestamp = formatTimestamp(message.timestamp)
+            val role = when (message.role) {
+                MessageRole.USER -> "👤 User"
+                MessageRole.ASSISTANT -> "🤖 Assistant"
+                MessageRole.SYSTEM -> "⚙️ System"
+            }
+
+            println("[$timestamp] $role:")
+            println(message.content)
+
+            message.tokenUsage?.let { usage ->
+                println("📊 Tokens: ${usage.totalTokens} (prompt: ${usage.promptTokens}, completion: ${usage.completionTokens})")
+            }
+
+            println("-" * 40)
+        }
+    }
+
+    private fun handleHistorySearch(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: history search <query>")
+            return
+        }
+
+        val query = args.joinToString(" ")
+        val criteria = HistorySearchCriteria(query = query, limit = 20)
+        val conversations = historyManager.searchConversations(criteria)
+
+        if (conversations.isEmpty()) {
+            println("No conversations found matching: $query")
+            return
+        }
+
+        println("Search Results for: $query")
+        println("=" * 60)
+
+        conversations.forEach { conversation ->
+            val date = formatTimestamp(conversation.updatedAt)
+            println("ID: ${conversation.id.take(8)}")
+            println("Title: ${conversation.title}")
+            println("Provider: ${conversation.provider} (${conversation.model})")
+            println("Updated: $date")
+            println("Summary: ${conversation.getSummary()}")
+            println("-" * 40)
+        }
+    }
+
+    private fun handleHistoryDelete(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: history delete <conversation-id>")
+            return
+        }
+
+        val conversationId = args[0]
+        val deleted = historyManager.deleteConversation(conversationId)
+
+        if (deleted) {
+            println("✅ Conversation deleted: $conversationId")
+        } else {
+            println("❌ Conversation not found: $conversationId")
+        }
+    }
+
+    private fun handleHistoryClear() {
+        print("Are you sure you want to clear all conversation history? (y/N): ")
+        val confirmation = readlnOrNull()?.lowercase()
+
+        if (confirmation == "y" || confirmation == "yes") {
+            historyManager.clearAllConversations()
+            println("✅ All conversation history cleared.")
+        } else {
+            println("Operation cancelled.")
+        }
+    }
+
+    private fun handleHistoryStats() {
+        val stats = historyManager.getStatistics()
+
+        println("Conversation History Statistics:")
+        println("=" * 40)
+        println("Total Conversations: ${stats.totalConversations}")
+        println("Total Messages: ${stats.totalMessages}")
+        println("Total Tokens Used: ${stats.totalTokensUsed}")
+        println()
+
+        if (stats.providerBreakdown.isNotEmpty()) {
+            println("Provider Breakdown:")
+            stats.providerBreakdown.forEach { (provider, count) ->
+                println("  $provider: $count conversations")
+            }
+            println()
+        }
+
+        stats.oldestConversation?.let { oldest ->
+            println("Oldest Conversation: ${formatTimestamp(oldest)}")
+        }
+
+        stats.newestConversation?.let { newest ->
+            println("Newest Conversation: ${formatTimestamp(newest)}")
+        }
+    }
+
+    private fun formatTimestamp(epochSecond: Long): String {
+        val dateTime = LocalDateTime.ofInstant(
+            Instant.ofEpochSecond(epochSecond),
+            ZoneId.systemDefault()
+        )
+        return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+    }
+
+    private operator fun String.times(n: Int): String = this.repeat(n)
 }
