@@ -7,6 +7,8 @@ fun main(args: Array<String>) {
 
 class AiCodingCli {
     fun run(args: Array<String>) {
-        // TODO: Implement command line argument parsing
+        if (args.isNotEmpty() && args[0] == "--version") {
+            println("0.1.0")
+        }
     }
 }
