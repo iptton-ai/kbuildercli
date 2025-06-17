@@ -288,4 +288,312 @@ class AiCodingCliTest {
             System.setOut(originalOut)
         }
     }
+
+    @Test
+    fun `should show history help when history command has no arguments`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Conversation History Management Commands"))
+            assertTrue(output.contains("history list"))
+            assertTrue(output.contains("history show"))
+            assertTrue(output.contains("history search"))
+            assertTrue(output.contains("history delete"))
+            assertTrue(output.contains("history clear"))
+            assertTrue(output.contains("history stats"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history list command`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "list"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should either show conversations or "No conversation history found"
+            assertTrue(output.contains("Recent Conversations") || output.contains("No conversation history found"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history list with limit parameter`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "list", "--limit", "5"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should either show conversations or "No conversation history found"
+            assertTrue(output.contains("Recent Conversations") || output.contains("No conversation history found"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history show with missing ID`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "show"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Usage: history show <conversation-id>"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history show with non-existent ID`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "show", "non-existent-id"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Conversation not found: non-existent-id"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history search with missing query`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "search"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Usage: history search <query>"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history search with query`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "search", "kotlin"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should either show search results or "No conversations found"
+            assertTrue(output.contains("Search Results for: kotlin") || output.contains("No conversations found matching: kotlin"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history delete with missing ID`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "delete"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Usage: history delete <conversation-id>"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history delete with non-existent ID`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "delete", "non-existent-id"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Conversation not found: non-existent-id"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle history stats command`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "stats"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Conversation History Statistics"))
+            assertTrue(output.contains("Total Conversations"))
+            assertTrue(output.contains("Total Messages"))
+            assertTrue(output.contains("Total Tokens Used"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle unknown history subcommand`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("history", "unknown"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Unknown history subcommand: unknown"))
+            assertTrue(output.contains("Conversation History Management Commands"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle continue parameter correctly`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act - This will fail because the conversation ID doesn't exist
+            cli.run(arrayOf("ask", "--continue", "non-existent-id", "Hello"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("Conversation not found: non-existent-id"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle continue parameter without ID`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act
+            cli.run(arrayOf("ask", "--continue"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            assertTrue(output.contains("--continue requires a conversation ID"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle new parameter correctly`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act - This will fail due to invalid API key, but we can check the parameter parsing
+            cli.run(arrayOf("ask", "--new", "--provider", "ollama", "Hello"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should show that it's asking OLLAMA (parameter parsing worked)
+            assertTrue(output.contains("Asking OLLAMA") || output.contains("Error asking question"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
 }
