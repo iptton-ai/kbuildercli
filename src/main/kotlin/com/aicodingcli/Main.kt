@@ -5,7 +5,10 @@ import com.aicodingcli.config.ConfigManager
 import com.aicodingcli.history.HistoryManager
 import com.aicodingcli.history.HistorySearchCriteria
 import com.aicodingcli.history.MessageTokenUsage
+import com.aicodingcli.code.analysis.DefaultCodeAnalyzer
+import com.aicodingcli.code.common.ProgrammingLanguage
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -28,6 +31,7 @@ Commands:
   ask <message>      Ask AI a question
   config <subcommand> Manage configuration settings
   history <subcommand> Manage conversation history
+  analyze <subcommand> Analyze code files and projects
 
 Options:
   --version          Show version information
@@ -41,6 +45,7 @@ Options:
 
     private val configManager = ConfigManager()
     private val historyManager = HistoryManager()
+    private val codeAnalyzer = DefaultCodeAnalyzer()
 
     fun run(args: Array<String>) {
         val (command, options) = parseArgs(args)
@@ -53,6 +58,7 @@ Options:
             command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model, options.stream, options.continueConversationId, options.forceNew)
             command == "config" -> handleConfigCommand(args.drop(1).toTypedArray())
             command == "history" -> handleHistoryCommand(args.drop(1).toTypedArray())
+            command == "analyze" -> handleAnalyzeCommand(args.drop(1).toTypedArray())
             else -> {
                 println("Unknown command: $command")
                 printHelp()
@@ -808,4 +814,376 @@ Options:
     }
 
     private operator fun String.times(n: Int): String = this.repeat(n)
+
+    // Code Analysis Commands
+    private fun handleAnalyzeCommand(args: Array<String>) {
+        if (args.isEmpty()) {
+            printAnalyzeHelp()
+            return
+        }
+
+        when (args[0]) {
+            "file" -> handleAnalyzeFile(args.drop(1).toTypedArray())
+            "project" -> handleAnalyzeProject(args.drop(1).toTypedArray())
+            "metrics" -> handleAnalyzeMetrics(args.drop(1).toTypedArray())
+            "issues" -> handleAnalyzeIssues(args.drop(1).toTypedArray())
+            else -> {
+                println("Unknown analyze subcommand: ${args[0]}")
+                printAnalyzeHelp()
+            }
+        }
+    }
+
+    private fun printAnalyzeHelp() {
+        println("""
+            Code Analysis Commands:
+
+            analyze file <file-path>        Analyze a single file
+            analyze project <project-path>  Analyze an entire project
+            analyze metrics <file-path>     Show code metrics for a file
+            analyze issues <file-path>      Show code issues for a file
+
+            Options:
+            --format <format>               Output format (text, json) [default: text]
+            --language <lang>               Force language detection (kotlin, java, python)
+
+            Examples:
+            analyze file src/main/kotlin/Main.kt
+            analyze project src/main/kotlin
+            analyze metrics --format json src/main/kotlin/Main.kt
+            analyze issues src/main/kotlin/Main.kt
+        """.trimIndent())
+    }
+
+    private fun handleAnalyzeFile(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: analyze file <file-path> [--format <format>] [--language <lang>]")
+            return
+        }
+
+        val filePath = args[0]
+        val options = parseAnalyzeOptions(args.drop(1).toTypedArray())
+
+        runBlocking {
+            try {
+                val result = codeAnalyzer.analyzeFile(filePath)
+                displayAnalysisResult(result, options.format)
+            } catch (e: Exception) {
+                println("❌ Error analyzing file: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleAnalyzeProject(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: analyze project <project-path> [--format <format>]")
+            return
+        }
+
+        val projectPath = args[0]
+        val options = parseAnalyzeOptions(args.drop(1).toTypedArray())
+
+        runBlocking {
+            try {
+                val result = codeAnalyzer.analyzeProject(projectPath)
+                displayProjectAnalysisResult(result, options.format)
+            } catch (e: Exception) {
+                println("❌ Error analyzing project: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleAnalyzeMetrics(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: analyze metrics <file-path> [--format <format>]")
+            return
+        }
+
+        val filePath = args[0]
+        val options = parseAnalyzeOptions(args.drop(1).toTypedArray())
+
+        runBlocking {
+            try {
+                val result = codeAnalyzer.analyzeFile(filePath)
+                displayMetrics(result.metrics, options.format)
+            } catch (e: Exception) {
+                println("❌ Error analyzing metrics: ${e.message}")
+            }
+        }
+    }
+
+    private fun handleAnalyzeIssues(args: Array<String>) {
+        if (args.isEmpty()) {
+            println("Usage: analyze issues <file-path> [--format <format>]")
+            return
+        }
+
+        val filePath = args[0]
+        val options = parseAnalyzeOptions(args.drop(1).toTypedArray())
+
+        runBlocking {
+            try {
+                val result = codeAnalyzer.analyzeFile(filePath)
+                displayIssues(result.issues, options.format)
+            } catch (e: Exception) {
+                println("❌ Error analyzing issues: ${e.message}")
+            }
+        }
+    }
+
+    private data class AnalyzeOptions(
+        val format: String = "text",
+        val language: ProgrammingLanguage? = null
+    )
+
+    private fun parseAnalyzeOptions(args: Array<String>): AnalyzeOptions {
+        var format = "text"
+        var language: ProgrammingLanguage? = null
+
+        var i = 0
+        while (i < args.size) {
+            when (args[i]) {
+                "--format" -> {
+                    if (i + 1 < args.size) {
+                        format = args[i + 1]
+                        i += 2
+                    } else {
+                        println("--format requires a value")
+                        i++
+                    }
+                }
+                "--language" -> {
+                    if (i + 1 < args.size) {
+                        language = when (args[i + 1].lowercase()) {
+                            "kotlin" -> ProgrammingLanguage.KOTLIN
+                            "java" -> ProgrammingLanguage.JAVA
+                            "python" -> ProgrammingLanguage.PYTHON
+                            "javascript" -> ProgrammingLanguage.JAVASCRIPT
+                            "typescript" -> ProgrammingLanguage.TYPESCRIPT
+                            else -> {
+                                println("Unknown language: ${args[i + 1]}")
+                                null
+                            }
+                        }
+                        i += 2
+                    } else {
+                        println("--language requires a value")
+                        i++
+                    }
+                }
+                else -> i++
+            }
+        }
+
+        return AnalyzeOptions(format, language)
+    }
+
+    private fun displayAnalysisResult(result: com.aicodingcli.code.analysis.CodeAnalysisResult, format: String) {
+        when (format.lowercase()) {
+            "json" -> displayAnalysisResultJson(result)
+            else -> displayAnalysisResultText(result)
+        }
+    }
+
+    private fun displayAnalysisResultText(result: com.aicodingcli.code.analysis.CodeAnalysisResult) {
+        println("📊 Code Analysis Results")
+        println("=" * 50)
+        println("File: ${result.filePath}")
+        println("Language: ${result.language.displayName}")
+        println()
+
+        // Display metrics
+        println("📈 Metrics:")
+        println("  Lines of Code: ${result.metrics.linesOfCode}")
+        println("  Cyclomatic Complexity: ${result.metrics.cyclomaticComplexity}")
+        println("  Maintainability Index: ${"%.1f".format(result.metrics.maintainabilityIndex)}")
+        result.metrics.testCoverage?.let { coverage ->
+            println("  Test Coverage: ${"%.1f".format(coverage)}%")
+        }
+        println("  Duplicated Lines: ${result.metrics.duplicatedLines}")
+        println()
+
+        // Display issues
+        if (result.issues.isNotEmpty()) {
+            println("⚠️  Issues (${result.issues.size}):")
+            result.issues.forEach { issue ->
+                val severity = when (issue.severity) {
+                    com.aicodingcli.code.analysis.IssueSeverity.CRITICAL -> "🔴 CRITICAL"
+                    com.aicodingcli.code.analysis.IssueSeverity.HIGH -> "🟠 HIGH"
+                    com.aicodingcli.code.analysis.IssueSeverity.MEDIUM -> "🟡 MEDIUM"
+                    com.aicodingcli.code.analysis.IssueSeverity.LOW -> "🟢 LOW"
+                }
+                val location = if (issue.line != null) " (line ${issue.line})" else ""
+                println("  $severity: ${issue.message}$location")
+                issue.suggestion?.let { suggestion ->
+                    println("    💡 Suggestion: $suggestion")
+                }
+            }
+            println()
+        }
+
+        // Display suggestions
+        if (result.suggestions.isNotEmpty()) {
+            println("💡 Improvement Suggestions (${result.suggestions.size}):")
+            result.suggestions.forEach { suggestion ->
+                val priority = when (suggestion.priority) {
+                    com.aicodingcli.code.analysis.ImprovementPriority.HIGH -> "🔴 HIGH"
+                    com.aicodingcli.code.analysis.ImprovementPriority.MEDIUM -> "🟡 MEDIUM"
+                    com.aicodingcli.code.analysis.ImprovementPriority.LOW -> "🟢 LOW"
+                }
+                val location = if (suggestion.line != null) " (line ${suggestion.line})" else ""
+                println("  $priority: ${suggestion.description}$location")
+            }
+            println()
+        }
+
+        // Display dependencies
+        if (result.dependencies.isNotEmpty()) {
+            println("📦 Dependencies (${result.dependencies.size}):")
+            result.dependencies.forEach { dependency ->
+                println("  ${dependency.name} (${dependency.version ?: "unknown"}) - ${dependency.type}")
+            }
+        }
+    }
+
+    private fun displayAnalysisResultJson(result: com.aicodingcli.code.analysis.CodeAnalysisResult) {
+        // Simple JSON output - in a real implementation, you'd use a JSON library
+        println("""{
+  "filePath": "${result.filePath}",
+  "language": "${result.language.displayName}",
+  "metrics": {
+    "linesOfCode": ${result.metrics.linesOfCode},
+    "cyclomaticComplexity": ${result.metrics.cyclomaticComplexity},
+    "maintainabilityIndex": ${result.metrics.maintainabilityIndex},
+    "testCoverage": ${result.metrics.testCoverage},
+    "duplicatedLines": ${result.metrics.duplicatedLines}
+  },
+  "issuesCount": ${result.issues.size},
+  "suggestionsCount": ${result.suggestions.size},
+  "dependenciesCount": ${result.dependencies.size}
+}""")
+    }
+
+    private fun displayProjectAnalysisResult(result: com.aicodingcli.code.analysis.ProjectAnalysisResult, format: String) {
+        when (format.lowercase()) {
+            "json" -> displayProjectAnalysisResultJson(result)
+            else -> displayProjectAnalysisResultText(result)
+        }
+    }
+
+    private fun displayProjectAnalysisResultText(result: com.aicodingcli.code.analysis.ProjectAnalysisResult) {
+        println("📊 Project Analysis Results")
+        println("=" * 50)
+        println("Project: ${result.projectPath}")
+        println("Files Analyzed: ${result.fileResults.size}")
+        println()
+
+        // Display overall metrics
+        println("📈 Overall Metrics:")
+        println("  Total Lines of Code: ${result.overallMetrics.linesOfCode}")
+        println("  Average Complexity: ${"%.1f".format(result.overallMetrics.cyclomaticComplexity)}")
+        println("  Average Maintainability: ${"%.1f".format(result.overallMetrics.maintainabilityIndex)}")
+        println()
+
+        // Display summary
+        println("📋 Summary:")
+        println("  Total Files: ${result.summary.totalFiles}")
+        println("  Total Issues: ${result.summary.totalIssues}")
+        println("  Critical Issues: ${result.summary.criticalIssues}")
+        println("  Average Complexity: ${"%.1f".format(result.summary.averageComplexity)}")
+        println("  Overall Maintainability: ${"%.1f".format(result.summary.overallMaintainabilityIndex)}")
+        println()
+
+        // Display top issues by file
+        val filesWithIssues = result.fileResults.filter { it.issues.isNotEmpty() }
+        if (filesWithIssues.isNotEmpty()) {
+            println("⚠️  Files with Issues:")
+            filesWithIssues.sortedByDescending { it.issues.size }.take(10).forEach { fileResult ->
+                val fileName = File(fileResult.filePath).name
+                println("  $fileName: ${fileResult.issues.size} issues")
+            }
+        }
+    }
+
+    private fun displayProjectAnalysisResultJson(result: com.aicodingcli.code.analysis.ProjectAnalysisResult) {
+        println("""{
+  "projectPath": "${result.projectPath}",
+  "filesAnalyzed": ${result.fileResults.size},
+  "overallMetrics": {
+    "linesOfCode": ${result.overallMetrics.linesOfCode},
+    "averageComplexity": ${result.overallMetrics.cyclomaticComplexity},
+    "averageMaintainability": ${result.overallMetrics.maintainabilityIndex}
+  },
+  "summary": {
+    "totalFiles": ${result.summary.totalFiles},
+    "totalIssues": ${result.summary.totalIssues},
+    "criticalIssues": ${result.summary.criticalIssues},
+    "averageComplexity": ${result.summary.averageComplexity},
+    "overallMaintainability": ${result.summary.overallMaintainabilityIndex}
+  }
+}""")
+    }
+
+    private fun displayMetrics(metrics: com.aicodingcli.code.analysis.CodeMetrics, format: String) {
+        when (format.lowercase()) {
+            "json" -> {
+                println("""{
+  "linesOfCode": ${metrics.linesOfCode},
+  "cyclomaticComplexity": ${metrics.cyclomaticComplexity},
+  "maintainabilityIndex": ${metrics.maintainabilityIndex},
+  "testCoverage": ${metrics.testCoverage},
+  "duplicatedLines": ${metrics.duplicatedLines}
+}""")
+            }
+            else -> {
+                println("📈 Code Metrics:")
+                println("  Lines of Code: ${metrics.linesOfCode}")
+                println("  Cyclomatic Complexity: ${metrics.cyclomaticComplexity}")
+                println("  Maintainability Index: ${"%.1f".format(metrics.maintainabilityIndex)}")
+                metrics.testCoverage?.let { coverage ->
+                    println("  Test Coverage: ${"%.1f".format(coverage)}%")
+                }
+                println("  Duplicated Lines: ${metrics.duplicatedLines}")
+            }
+        }
+    }
+
+    private fun displayIssues(issues: List<com.aicodingcli.code.analysis.CodeIssue>, format: String) {
+        when (format.lowercase()) {
+            "json" -> {
+                println("[")
+                issues.forEachIndexed { index, issue ->
+                    println("""  {
+    "type": "${issue.type}",
+    "severity": "${issue.severity}",
+    "message": "${issue.message}",
+    "line": ${issue.line},
+    "column": ${issue.column},
+    "suggestion": "${issue.suggestion}"
+  }${if (index < issues.size - 1) "," else ""}""")
+                }
+                println("]")
+            }
+            else -> {
+                if (issues.isEmpty()) {
+                    println("✅ No issues found!")
+                } else {
+                    println("⚠️  Code Issues (${issues.size}):")
+                    issues.forEach { issue ->
+                        val severity = when (issue.severity) {
+                            com.aicodingcli.code.analysis.IssueSeverity.CRITICAL -> "🔴 CRITICAL"
+                            com.aicodingcli.code.analysis.IssueSeverity.HIGH -> "🟠 HIGH"
+                            com.aicodingcli.code.analysis.IssueSeverity.MEDIUM -> "🟡 MEDIUM"
+                            com.aicodingcli.code.analysis.IssueSeverity.LOW -> "🟢 LOW"
+                        }
+                        val location = if (issue.line != null) " (line ${issue.line})" else ""
+                        println("  $severity: ${issue.message}$location")
+                        issue.suggestion?.let { suggestion ->
+                            println("    💡 Suggestion: $suggestion")
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
