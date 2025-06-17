@@ -10,7 +10,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 
 /**
@@ -85,6 +88,49 @@ class AiHttpClient(
                 setBody(body)
             }
             handleResponse(response)
+        }
+    }
+
+    /**
+     * Make streaming POST request for Server-Sent Events or JSONL
+     */
+    suspend fun postStream(
+        url: String,
+        body: String,
+        headers: Map<String, String> = emptyMap()
+    ): Flow<String> {
+        return flow {
+            val response = client.post(url) {
+                headers.forEach { (key, value) ->
+                    header(key, value)
+                }
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                setBody(body)
+            }
+
+            if (!response.status.isSuccess()) {
+                val errorBody = response.bodyAsText()
+                throw HttpException(response.status, errorBody)
+            }
+
+            val channel = response.bodyAsChannel()
+
+            while (!channel.isClosedForRead) {
+                val chunk = channel.readUTF8Line()
+                if (chunk != null) {
+                    if (chunk.startsWith("data: ")) {
+                        // Server-Sent Events format (OpenAI, Claude)
+                        val data = chunk.substring(6)
+                        if (data == "[DONE]") {
+                            break
+                        }
+                        emit(data)
+                    } else if (chunk.trim().isNotEmpty()) {
+                        // JSONL format (Ollama)
+                        emit(chunk.trim())
+                    }
+                }
+            }
         }
     }
 

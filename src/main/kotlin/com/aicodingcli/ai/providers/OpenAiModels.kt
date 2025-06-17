@@ -68,13 +68,13 @@ data class OpenAiStreamResponse(
 @Serializable
 data class OpenAiStreamChoice(
     val index: Int,
-    val delta: OpenAiDelta,
+    val delta: OpenAiStreamDelta,
     @SerialName("finish_reason")
-    val finishReason: String?
+    val finishReason: String? = null
 )
 
 @Serializable
-data class OpenAiDelta(
+data class OpenAiStreamDelta(
     val role: String? = null,
     val content: String? = null
 )

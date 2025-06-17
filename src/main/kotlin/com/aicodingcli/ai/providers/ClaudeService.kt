@@ -49,16 +49,42 @@ class ClaudeService(
 
     override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
         validateRequest(request)
-        
+
         return flow {
             try {
                 val claudeRequest = convertToClaudeRequest(request.copy(stream = true))
                 val requestBody = json.encodeToString(claudeRequest)
-                
-                // For now, we'll emit a simple mock stream
-                // In a real implementation, this would handle Server-Sent Events (SSE)
-                emit(AiStreamChunk("Mock streaming response from Claude", FinishReason.STOP))
-                
+
+                httpClient.postStream(
+                    url = "$baseUrl/messages",
+                    body = requestBody,
+                    headers = createHeaders()
+                ).collect { data ->
+                    if (data.isNotBlank()) {
+                        try {
+                            val streamEvent = json.decodeFromString<ClaudeStreamEvent>(data)
+
+                            when (streamEvent.type) {
+                                "content_block_delta" -> {
+                                    val content = streamEvent.delta?.text ?: ""
+                                    emit(AiStreamChunk(content, null))
+                                }
+                                "message_stop" -> {
+                                    val finishReason = when (streamEvent.message?.stopReason) {
+                                        "end_turn" -> FinishReason.STOP
+                                        "max_tokens" -> FinishReason.LENGTH
+                                        "stop_sequence" -> FinishReason.STOP
+                                        else -> FinishReason.STOP
+                                    }
+                                    emit(AiStreamChunk("", finishReason))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Skip malformed JSON chunks
+                        }
+                    }
+                }
+
             } catch (e: HttpException) {
                 throw handleHttpException(e)
             } catch (e: Exception) {
@@ -109,7 +135,7 @@ class ClaudeService(
         return ClaudeRequest(
             model = request.model,
             messages = claudeMessages,
-            maxTokens = request.maxTokens ?: config.maxTokens ?: 1000,
+            maxTokens = request.maxTokens,
             temperature = request.temperature,
             stream = request.stream
         )

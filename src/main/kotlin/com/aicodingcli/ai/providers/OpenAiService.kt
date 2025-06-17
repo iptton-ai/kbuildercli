@@ -49,16 +49,41 @@ class OpenAiService(
 
     override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
         validateRequest(request)
-        
+
         return flow {
             try {
                 val openAiRequest = convertToOpenAiRequest(request.copy(stream = true))
                 val requestBody = json.encodeToString(openAiRequest)
-                
-                // For now, we'll emit a simple mock stream
-                // In a real implementation, this would handle Server-Sent Events (SSE)
-                emit(AiStreamChunk("Mock streaming response from OpenAI", FinishReason.STOP))
-                
+
+                httpClient.postStream(
+                    url = "$baseUrl/chat/completions",
+                    body = requestBody,
+                    headers = createHeaders()
+                ).collect { data ->
+                    if (data.isNotBlank()) {
+                        try {
+                            val streamResponse = json.decodeFromString<OpenAiStreamResponse>(data)
+                            val choice = streamResponse.choices.firstOrNull()
+
+                            if (choice != null) {
+                                val content = choice.delta.content ?: ""
+                                val finishReason = when (choice.finishReason) {
+                                    "stop" -> FinishReason.STOP
+                                    "length" -> FinishReason.LENGTH
+                                    "content_filter" -> FinishReason.CONTENT_FILTER
+                                    "function_call" -> FinishReason.FUNCTION_CALL
+                                    null -> null
+                                    else -> FinishReason.STOP
+                                }
+
+                                emit(AiStreamChunk(content, finishReason))
+                            }
+                        } catch (e: Exception) {
+                            // Skip malformed JSON chunks
+                        }
+                    }
+                }
+
             } catch (e: HttpException) {
                 throw handleHttpException(e)
             } catch (e: Exception) {

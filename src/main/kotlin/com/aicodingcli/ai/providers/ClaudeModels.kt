@@ -62,8 +62,9 @@ data class ClaudeUsage(
 @Serializable
 data class ClaudeStreamEvent(
     val type: String,
-    val message: ClaudeStreamMessage? = null,
+    val index: Int? = null,
     val delta: ClaudeStreamDelta? = null,
+    val message: ClaudeStreamMessage? = null,
     val usage: ClaudeUsage? = null
 )
 
@@ -75,9 +76,9 @@ data class ClaudeStreamMessage(
     val content: List<ClaudeContent>,
     val model: String,
     @SerialName("stop_reason")
-    val stopReason: String?,
+    val stopReason: String? = null,
     @SerialName("stop_sequence")
-    val stopSequence: String?,
+    val stopSequence: String? = null,
     val usage: ClaudeUsage
 )
 

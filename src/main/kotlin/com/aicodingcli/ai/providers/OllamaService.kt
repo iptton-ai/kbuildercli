@@ -49,16 +49,40 @@ class OllamaService(
 
     override suspend fun streamChat(request: AiRequest): Flow<AiStreamChunk> {
         validateRequest(request)
-        
+
         return flow {
             try {
                 val ollamaRequest = convertToOllamaRequest(request.copy(stream = true))
                 val requestBody = json.encodeToString(ollamaRequest)
-                
-                // For now, we'll emit a simple mock stream
-                // In a real implementation, this would handle Server-Sent Events (SSE)
-                emit(AiStreamChunk("Mock streaming response from Ollama", FinishReason.STOP))
-                
+
+                httpClient.postStream(
+                    url = "$baseUrl/api/chat",
+                    body = requestBody,
+                    headers = createHeaders()
+                ).collect { data ->
+                    if (data.isNotBlank()) {
+                        try {
+                            val streamResponse = json.decodeFromString<OllamaResponse>(data)
+                            val content = streamResponse.message.content
+
+                            val finishReason = if (streamResponse.done) {
+                                when (streamResponse.doneReason) {
+                                    "stop" -> FinishReason.STOP
+                                    "length" -> FinishReason.LENGTH
+                                    null -> FinishReason.STOP
+                                    else -> FinishReason.STOP
+                                }
+                            } else {
+                                null
+                            }
+
+                            emit(AiStreamChunk(content, finishReason))
+                        } catch (e: Exception) {
+                            // Skip malformed JSON chunks
+                        }
+                    }
+                }
+
             } catch (e: HttpException) {
                 throw handleHttpException(e)
             } catch (e: Exception) {
@@ -100,7 +124,7 @@ class OllamaService(
         
         val options = OllamaOptions(
             temperature = request.temperature,
-            numPredict = request.maxTokens ?: config.maxTokens
+            numPredict = request.maxTokens
         )
         
         return OllamaRequest(

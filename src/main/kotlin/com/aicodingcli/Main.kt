@@ -25,7 +25,8 @@ Options:
   --version          Show version information
   --help             Show this help message
   --provider <name>  Use specific AI provider (openai, claude, ollama)
-  --model <name>     Use specific model for the AI provider"""
+  --model <name>     Use specific model for the AI provider
+  --stream           Enable streaming response (real-time output)"""
     }
 
     private val configManager = ConfigManager()
@@ -38,7 +39,7 @@ Options:
             command == "--version" -> printVersion()
             command == "--help" -> printHelp()
             command == "test-connection" -> testConnection(options.provider, options.model)
-            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model)
+            command == "ask" && options.message.isNotEmpty() -> askQuestion(options.message, options.provider, options.model, options.stream)
             command == "config" -> handleConfigCommand(args.drop(1).toTypedArray())
             else -> {
                 println("Unknown command: $command")
@@ -50,6 +51,7 @@ Options:
     private data class CommandOptions(
         val provider: AiProvider? = null,
         val model: String? = null,
+        val stream: Boolean = false,
         val message: String = ""
     )
 
@@ -59,6 +61,7 @@ Options:
         var command = args[0]
         var provider: AiProvider? = null
         var model: String? = null
+        var stream = false
         var message = ""
 
         var i = 1
@@ -90,6 +93,10 @@ Options:
                         return command to CommandOptions()
                     }
                 }
+                "--stream" -> {
+                    stream = true
+                    i++
+                }
                 else -> {
                     if (command == "ask") {
                         message = args.drop(i).joinToString(" ")
@@ -100,7 +107,7 @@ Options:
             }
         }
 
-        return command to CommandOptions(provider, model, message)
+        return command to CommandOptions(provider, model, stream, message)
     }
 
     private fun printVersion() {
@@ -140,7 +147,7 @@ Options:
         }
     }
 
-    private fun askQuestion(question: String, provider: AiProvider? = null, model: String? = null) {
+    private fun askQuestion(question: String, provider: AiProvider? = null, model: String? = null, stream: Boolean = false) {
         runBlocking {
             try {
                 val config = if (provider != null) {
@@ -160,16 +167,36 @@ Options:
                     ),
                     model = config.model,
                     temperature = config.temperature,
-                    maxTokens = config.maxTokens
+                    maxTokens = config.maxTokens,
+                    stream = stream
                 )
 
                 println("🤖 Asking ${config.provider}...")
                 if (model != null) {
                     println("   Using model: $model")
                 }
-                val response = service.chat(request)
-                println("\n${response.content}")
-                println("\n📊 Usage: ${response.usage.totalTokens} tokens")
+                if (stream) {
+                    println("   Streaming mode enabled")
+                    println()
+
+                    // Handle streaming response
+                    var totalTokens = 0
+                    service.streamChat(request).collect { chunk ->
+                        print(chunk.content)
+                        System.out.flush()
+
+                        if (chunk.finishReason != null) {
+                            println("\n")
+                            // Note: Token usage might not be available in streaming mode for all providers
+                            println("📊 Streaming response completed")
+                        }
+                    }
+                } else {
+                    // Handle regular response
+                    val response = service.chat(request)
+                    println("\n${response.content}")
+                    println("\n📊 Usage: ${response.usage.totalTokens} tokens")
+                }
 
             } catch (e: Exception) {
                 println("❌ Error asking question: ${e.message}")

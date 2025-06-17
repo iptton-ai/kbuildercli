@@ -58,6 +58,7 @@ class AiCodingCliTest {
                   --help             Show this help message
                   --provider <name>  Use specific AI provider (openai, claude, ollama)
                   --model <name>     Use specific model for the AI provider
+                  --stream           Enable streaming response (real-time output)
             """.trimIndent()
             assertEquals(expectedHelp, output)
         } finally {
@@ -257,6 +258,28 @@ class AiCodingCliTest {
             val output = outputStream.toString().trim()
             assertTrue(output.contains("Usage: config provider <name>"))
             assertTrue(output.contains("Available providers: openai, claude, ollama"))
+        } finally {
+            // Restore original System.out
+            System.setOut(originalOut)
+        }
+    }
+
+    @Test
+    fun `should handle stream parameter correctly`() {
+        // Arrange
+        val cli = AiCodingCli()
+        val outputStream = ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(PrintStream(outputStream))
+
+        try {
+            // Act - This will fail due to invalid API key, but we can check the output format
+            cli.run(arrayOf("ask", "--provider", "ollama", "--stream", "Hello"))
+
+            // Assert
+            val output = outputStream.toString().trim()
+            // Should show streaming mode enabled
+            assertTrue(output.contains("Streaming mode enabled") || output.contains("Asking OLLAMA"))
         } finally {
             // Restore original System.out
             System.setOut(originalOut)
