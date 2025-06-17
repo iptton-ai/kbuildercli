@@ -35,24 +35,12 @@ object AiServiceFactory {
      * Create AI service based on configuration
      */
     fun createService(config: AiServiceConfig): AiService {
-        // Validate configuration
-        validateConfig(config)
-        
+        // Configuration is already validated in AiServiceConfig.init
         return when (config.provider) {
             AiProvider.OPENAI -> OpenAiService(config)
             AiProvider.CLAUDE -> ClaudeService(config)
             AiProvider.GEMINI -> GeminiService(config)
             AiProvider.OLLAMA -> OllamaService(config)
-        }
-    }
-
-    private fun validateConfig(config: AiServiceConfig) {
-        // Additional validation logic can be added here
-        if (config.apiKey.isBlank()) {
-            throw IllegalArgumentException("API key cannot be empty")
-        }
-        if (config.temperature < 0.0f || config.temperature > 1.0f) {
-            throw IllegalArgumentException("Temperature must be between 0.0 and 1.0")
         }
     }
 }
