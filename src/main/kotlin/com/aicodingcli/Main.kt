@@ -8,6 +8,13 @@ fun main(args: Array<String>) {
 class AiCodingCli {
     companion object {
         const val VERSION = "0.1.0"
+        const val HELP_TEXT = """AI Coding CLI - A command line tool for AI-assisted coding
+
+Usage: ai-coding-cli [OPTIONS]
+
+Options:
+  --version    Show version information
+  --help       Show this help message"""
     }
 
     fun run(args: Array<String>) {
@@ -22,15 +29,6 @@ class AiCodingCli {
     }
 
     private fun printHelp() {
-        val helpText = """
-            AI Coding CLI - A command line tool for AI-assisted coding
-
-            Usage: ai-coding-cli [OPTIONS]
-
-            Options:
-              --version    Show version information
-              --help       Show this help message
-        """.trimIndent()
-        println(helpText)
+        println(HELP_TEXT)
     }
 }
