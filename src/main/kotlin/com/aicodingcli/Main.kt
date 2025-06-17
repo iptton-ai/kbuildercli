@@ -6,9 +6,17 @@ fun main(args: Array<String>) {
 }
 
 class AiCodingCli {
+    companion object {
+        const val VERSION = "0.1.0"
+    }
+
     fun run(args: Array<String>) {
-        if (args.isNotEmpty() && args[0] == "--version") {
-            println("0.1.0")
+        when {
+            args.isNotEmpty() && args[0] == "--version" -> printVersion()
         }
+    }
+
+    private fun printVersion() {
+        println(VERSION)
     }
 }
