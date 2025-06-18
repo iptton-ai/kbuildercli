@@ -134,8 +134,7 @@ data class ExecutionStep(
     val result: ToolResult,
     @Serializable(with = InstantSerializer::class)
     val executedAt: Instant = Instant.now(),
-    @Serializable(with = DurationSerializer::class)
-    val duration: Duration
+    val duration: kotlin.time.Duration
 )
 
 /**
@@ -220,6 +219,79 @@ data class ProjectContext(
     val dependencies: List<String> = emptyList(),
     val metadata: Map<String, String> = emptyMap()
 )
+
+/**
+ * Result of auto execution
+ */
+data class ExecutionResult(
+    val success: Boolean,
+    val sessionId: String?,
+    val finalStatus: ConversationStatus,
+    val executedSteps: List<ExecutionStep>,
+    val executionRounds: Int,
+    val executionTime: kotlin.time.Duration,
+    val summary: String? = null,
+    val error: String? = null
+) {
+    companion object {
+        fun success(
+            sessionId: String,
+            finalStatus: ConversationStatus,
+            executedSteps: List<ExecutionStep>,
+            executionRounds: Int,
+            executionTime: kotlin.time.Duration,
+            summary: String? = null
+        ): ExecutionResult {
+            return ExecutionResult(
+                success = true,
+                sessionId = sessionId,
+                finalStatus = finalStatus,
+                executedSteps = executedSteps,
+                executionRounds = executionRounds,
+                executionTime = executionTime,
+                summary = summary
+            )
+        }
+
+        fun failure(
+            sessionId: String?,
+            finalStatus: ConversationStatus,
+            executedSteps: List<ExecutionStep>,
+            executionRounds: Int,
+            executionTime: kotlin.time.Duration,
+            error: String
+        ): ExecutionResult {
+            return ExecutionResult(
+                success = false,
+                sessionId = sessionId,
+                finalStatus = finalStatus,
+                executedSteps = executedSteps,
+                executionRounds = executionRounds,
+                executionTime = executionTime,
+                error = error
+            )
+        }
+    }
+}
+
+/**
+ * Result of a single step execution
+ */
+data class StepResult(
+    val success: Boolean,
+    val toolResult: ToolResult?,
+    val error: String? = null
+) {
+    companion object {
+        fun success(toolResult: ToolResult): StepResult {
+            return StepResult(success = true, toolResult = toolResult)
+        }
+
+        fun failure(error: String): StepResult {
+            return StepResult(success = false, toolResult = null, error = error)
+        }
+    }
+}
 
 /**
  * Parsed requirement with intent and parameters
