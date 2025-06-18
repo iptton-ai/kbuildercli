@@ -29,6 +29,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+    
+      - name: Install Ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       
       # 自动分析 issue
       - name: Get Issue Number
