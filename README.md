@@ -1,7 +1,8 @@
 # KBuilderTDD
 
-[![Kotlin CI with Gradle](https://github.com/用户名/KBuilderTDD/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/用户名/KBuilderTDD/actions/workflows/unit-tests.yml)
-[![codecov](https://codecov.io/gh/用户名/KBuilderTDD/branch/main/graph/badge.svg)](https://codecov.io/gh/用户名/KBuilderTDD)
+[![Kotlin CI with Gradle](https://github.com/iptton-ai/kbuildercli/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/iptton-ai/kbuildercli/actions/workflows/unit-tests.yml)
+[![Code Coverage](https://img.shields.io/badge/Code%20Coverage-60.18%25-success.svg)](https://github.com/iptton-ai/KBuilderTDD/actions/workflows/unit-tests.yml)
+[![Branch Coverage](https://img.shields.io/badge/Branch%20Coverage-40.50%25-yellow.svg)](https://github.com/iptton-ai/KBuilderTDD/actions/workflows/unit-tests.yml)
 
 一个使用 TDD（测试驱动开发）方法构建的 Kotlin 项目。
 

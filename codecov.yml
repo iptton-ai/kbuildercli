@@ -27,3 +27,9 @@ comment:
   layout: "reach,diff,flags,files,footer"
   behavior: default
   require_changes: no
+  show_carryforward_flags: true
+  paths:
+    - "src/main/"
+  
+github_checks:
+  annotations: true
