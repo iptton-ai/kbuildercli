@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0  # 获取完整历史记录以便进行更好的分析
 
       - name: Analyze Issue with AutoDev Agent
-        uses: unit-mesh/autodev-remote-agent-action@v0.4.2
+        uses: unit-mesh/autodev-remote-agent-action@v0.4.0
         with:
           github-token: ${{ secrets.ISSUE_TOKEN }}
           deepseek-token: ${{ secrets.DEEPSEEK_TOKEN }}
