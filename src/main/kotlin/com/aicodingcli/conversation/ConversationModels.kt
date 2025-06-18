@@ -220,3 +220,37 @@ data class ProjectContext(
     val dependencies: List<String> = emptyList(),
     val metadata: Map<String, String> = emptyMap()
 )
+
+/**
+ * Parsed requirement with intent and parameters
+ */
+@Serializable
+data class ParsedRequirement(
+    val intent: Intent,
+    val parameters: Map<String, String>,
+    val confidence: Float = 1.0f,
+    val originalText: String
+)
+
+/**
+ * Intent types for requirements
+ */
+@Serializable
+enum class Intent {
+    CREATE_CLASS,           // Create a new class/interface
+    CREATE_API,             // Create API endpoints
+    CREATE_CONFIG,          // Create configuration files
+    CREATE_TESTS,           // Create test files
+    CREATE_SERVICE,         // Create service/microservice
+    CREATE_SYSTEM,          // Create complete system
+    CREATE_FORM,            // Create forms/UI components
+    CREATE_DOCUMENTATION,   // Create documentation
+    REFACTOR_CODE,          // Refactor existing code
+    IMPROVE_CODE,           // General code improvement
+    OPTIMIZE_PERFORMANCE,   // Performance optimization
+    FIX_BUG,               // Bug fixing
+    ADD_FEATURE,           // Add new feature
+    REMOVE_FEATURE,        // Remove feature
+    UPDATE_DEPENDENCY,     // Update dependencies
+    UNKNOWN                // Unknown intent
+}
