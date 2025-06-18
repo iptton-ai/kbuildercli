@@ -1,0 +1,66 @@
+# AutoDev Remote Agent 配置示例
+# 此文档说明如何配置和使用 AutoDev Remote Agent 进行 Issue 分析
+
+# LLM 提供商配置选项
+llm_options:
+  # 推荐使用 DeepSeek (需要配置 DEEPSEEK_TOKEN)
+  deepseek:
+    model: deepseek-chat  # 默认模型
+    
+  # 可选的替代提供商
+  # openai:
+  #   model: gpt-4-turbo
+  # glm:
+  #   model: glm-4
+
+# 分析深度选项
+analysis_depths:
+  shallow:
+    description: "快速分析，主要关注明显的模式，分析时间短（<30秒）"
+    use_case: "适合高访问量仓库的初步分析"
+  
+  medium:
+    description: "平衡的深入分析，提供有意义的洞察，分析时间适中（30-60秒）"
+    use_case: "适合大多数一般用例，默认设置"
+    
+  deep:
+    description: "深度分析包括依赖关系，全面的代码探索，分析时间较长（60-120秒）"
+    use_case: "适合复杂的问题和架构级别的分析"
+
+# 文件过滤设置
+file_filtering:
+  include_config_files: true    # 包括配置文件（例如build.gradle.kts, rollup.config.mjs等）
+  include_test_files: true      # 包括测试文件（__tests__/, *.test.js等）
+  
+  # 自定义模式（逗号分隔）
+  include_patterns: "*.gradle.kts,*.gradle,*.properties,*.kt"  # 强制包含的文件模式
+  exclude_patterns: "*.min.js,*.bundle.js"                     # 排除的文件模式
+  force_include_files: "build.gradle.kts,settings.gradle.kts"  # 始终包含的特定文件
+
+# 工作流使用范例
+usage_examples:
+  basic: |
+    - name: Analyze Issue
+      uses: unit-mesh/autodev-remote-agent-action@v0.4.2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deepseek-token: ${{ secrets.DEEPSEEK_TOKEN }}
+        analysis-depth: medium
+        auto-comment: true
+        auto-label: true
+        
+  advanced: |
+    - name: Advanced Analysis
+      uses: unit-mesh/autodev-remote-agent-action@v0.4.2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        deepseek-token: ${{ secrets.DEEPSEEK_TOKEN }}
+        analysis-depth: deep
+        auto-comment: true
+        auto-label: true
+        exclude-labels: 'wontfix,duplicate'
+        include-labels: 'bug,enhancement'
+        include-config-files: true
+        include-test-files: true
+        exclude-patterns: "*.min.js,node_modules/**"
+        force-include-files: "important-config.js,critical-setup.ts"

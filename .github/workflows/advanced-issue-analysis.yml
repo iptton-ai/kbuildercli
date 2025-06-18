@@ -1,0 +1,56 @@
+name: Advanced Issue Analysis
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  
+  # 也可以手动触发
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue 编号'
+        required: true
+        type: number
+      analysis_depth:
+        description: '分析深度 (shallow/medium/deep)'
+        required: false
+        default: 'medium'
+        type: choice
+        options:
+          - shallow
+          - medium
+          - deep
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # 自动分析 issue
+      - name: Get Issue Number
+        id: issue
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> $GITHUB_OUTPUT
+            echo "depth=${{ github.event.inputs.analysis_depth }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "depth=medium" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Analyze Issue with AutoDev Agent
+        uses: unit-mesh/autodev-remote-agent-action@v0.4.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deepseek-token: ${{ secrets.DEEPSEEK_TOKEN }}
+          analysis-depth: ${{ steps.issue.outputs.depth }}
+          auto-comment: true
+          auto-label: true
+          include-config-files: true
+          include-test-files: true
+          exclude-patterns: "*.min.js,*.bundle.js,node_modules/**"
+          force-include-files: "build.gradle.kts,settings.gradle.kts"
