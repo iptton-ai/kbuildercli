@@ -40,10 +40,13 @@ class DefaultAutoExecutionEngine(
     
     override suspend fun executeConversation(requirement: String): ExecutionResult {
         val startTime = kotlin.time.TimeSource.Monotonic.markNow()
-        
+
         try {
+
+
             // Handle empty requirement
             if (requirement.isBlank()) {
+
                 return ExecutionResult.success(
                     sessionId = "empty-session",
                     finalStatus = ConversationStatus.COMPLETED,
@@ -53,16 +56,16 @@ class DefaultAutoExecutionEngine(
                     summary = "Empty requirement - no action taken"
                 )
             }
-            
+
             // Create conversation session
             val session = conversationStateManager.createSession(requirement)
             
-            // Parse requirement
-            val parsedRequirement = requirementParser.parse(requirement)
+            // Parse requirement (for future use)
+            requirementParser.parse(requirement)
             
             // Create project context (simplified for now)
             val projectContext = ProjectContext(
-                projectPath = ".",
+                projectPath = "",  // Use empty path so files are created in working directory
                 language = "kotlin",
                 framework = "spring-boot",
                 buildTool = "gradle"
@@ -70,16 +73,21 @@ class DefaultAutoExecutionEngine(
             
             // Decompose into tasks
             val tasks = taskDecomposer.decompose(requirement, projectContext)
-            
+
             // Update session with tasks
             val sessionWithTasks = session.withTasks(tasks)
-            conversationStateManager.updateState(
+
+            // Save the session with tasks
+            conversationStateManager.updateSession(sessionWithTasks)
+
+            // Then update the status
+            val updatedSession = conversationStateManager.updateState(
                 sessionWithTasks.id,
                 sessionWithTasks.state.copy(status = ConversationStatus.PLANNING)
             )
-            
+
             // Execute tasks
-            return executeTasksInSession(sessionWithTasks, startTime)
+            return executeTasksInSession(updatedSession, startTime)
             
         } catch (e: Exception) {
             return ExecutionResult.failure(

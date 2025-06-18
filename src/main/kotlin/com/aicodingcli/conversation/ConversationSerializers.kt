@@ -8,6 +8,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.Duration
 import java.time.Instant
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Serializer for Instant objects
@@ -25,7 +26,7 @@ object InstantSerializer : KSerializer<Instant> {
 }
 
 /**
- * Serializer for Duration objects
+ * Serializer for java.time.Duration objects
  */
 object DurationSerializer : KSerializer<Duration> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Duration", PrimitiveKind.LONG)
@@ -36,5 +37,20 @@ object DurationSerializer : KSerializer<Duration> {
 
     override fun deserialize(decoder: Decoder): Duration {
         return Duration.ofMillis(decoder.decodeLong())
+    }
+}
+
+/**
+ * Serializer for kotlin.time.Duration objects
+ */
+object KotlinDurationSerializer : KSerializer<kotlin.time.Duration> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("KotlinDuration", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: kotlin.time.Duration) {
+        encoder.encodeLong(value.inWholeMilliseconds)
+    }
+
+    override fun deserialize(decoder: Decoder): kotlin.time.Duration {
+        return decoder.decodeLong().milliseconds
     }
 }

@@ -122,9 +122,13 @@ class DefaultTaskDecomposer : TaskDecomposer {
     }
     
     private fun isSimpleClassCreation(requirement: String): Boolean {
-        return requirement.contains("class") && 
-               (requirement.contains("simple") || requirement.contains("data")) &&
-               !requirement.contains("api") && !requirement.contains("endpoint")
+        return requirement.contains("class") &&
+               !requirement.contains("api") && !requirement.contains("endpoint") &&
+               !requirement.contains("rest") && !requirement.contains("crud") &&
+               (requirement.contains("simple") || requirement.contains("data") ||
+                requirement.contains("create") || requirement.contains("user") ||
+                requirement.contains("person") || requirement.contains("customer") ||
+                requirement.contains("product") || requirement.contains("validation"))
     }
     
     private fun isRestApiRequirement(requirement: String): Boolean {
@@ -147,7 +151,11 @@ class DefaultTaskDecomposer : TaskDecomposer {
         
         // Extract class name from requirement (simplified)
         val className = extractClassName(requirement) ?: "MyClass"
-        val filePath = "${context.projectPath}/src/main/kotlin/${className}.kt"
+        val filePath = if (context.projectPath.isBlank()) {
+            "${className}.kt"
+        } else {
+            "${context.projectPath}/src/main/kotlin/${className}.kt"
+        }
         
         // Generate basic class content
         val classContent = generateBasicClassContent(className, requirement, context)
@@ -182,7 +190,7 @@ class DefaultTaskDecomposer : TaskDecomposer {
                 ToolCall(
                     toolName = "save-file",
                     parameters = mapOf(
-                        "path" to "${context.projectPath}/src/main/kotlin/User.kt",
+                        "path" to if (context.projectPath.isBlank()) "User.kt" else "${context.projectPath}/src/main/kotlin/User.kt",
                         "file_content" to generateEntityClass(context)
                     )
                 )
@@ -199,7 +207,7 @@ class DefaultTaskDecomposer : TaskDecomposer {
                 ToolCall(
                     toolName = "save-file",
                     parameters = mapOf(
-                        "path" to "${context.projectPath}/src/main/kotlin/UserService.kt",
+                        "path" to if (context.projectPath.isBlank()) "UserService.kt" else "${context.projectPath}/src/main/kotlin/UserService.kt",
                         "file_content" to generateServiceClass(context)
                     )
                 )
@@ -217,7 +225,7 @@ class DefaultTaskDecomposer : TaskDecomposer {
                 ToolCall(
                     toolName = "save-file",
                     parameters = mapOf(
-                        "path" to "${context.projectPath}/src/main/kotlin/UserController.kt",
+                        "path" to if (context.projectPath.isBlank()) "UserController.kt" else "${context.projectPath}/src/main/kotlin/UserController.kt",
                         "file_content" to generateControllerClass(context)
                     )
                 )
@@ -377,12 +385,29 @@ class DefaultTaskDecomposer : TaskDecomposer {
         // Simple extraction - look for patterns like "create X class" or "X data class"
         val words = requirement.split(" ")
         val classIndex = words.indexOfFirst { it.lowercase() == "class" }
-        
+
         return when {
-            classIndex > 0 -> words[classIndex - 1].replaceFirstChar { it.uppercase() }
+            // First check for specific class names mentioned in the requirement
             requirement.contains("user", ignoreCase = true) -> "User"
             requirement.contains("person", ignoreCase = true) -> "Person"
-            else -> null
+            requirement.contains("customer", ignoreCase = true) -> "Customer"
+            requirement.contains("product", ignoreCase = true) -> "Product"
+            // Then try to extract from position relative to "class"
+            classIndex > 0 -> {
+                val candidateName = words[classIndex - 1]
+                // Skip common words like "data", "simple", etc.
+                if (candidateName.lowercase() in listOf("data", "simple", "basic", "new", "a", "an", "the")) {
+                    // Look for a proper noun before these words
+                    if (classIndex > 1) {
+                        words[classIndex - 2].replaceFirstChar { it.uppercase() }
+                    } else {
+                        "MyClass"
+                    }
+                } else {
+                    candidateName.replaceFirstChar { it.uppercase() }
+                }
+            }
+            else -> "MyClass"
         }
     }
     

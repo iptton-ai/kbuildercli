@@ -53,11 +53,20 @@ class ConversationStateManager(
     suspend fun updateState(sessionId: String, state: ConversationState): ConversationSession {
         val session = sessions[sessionId]
             ?: throw IllegalArgumentException("Conversation session not found: $sessionId")
-        
+
         val updatedSession = session.withUpdatedState(state)
         sessions[sessionId] = updatedSession
         saveSessions()
         return updatedSession
+    }
+
+    /**
+     * Update entire conversation session
+     */
+    suspend fun updateSession(session: ConversationSession): ConversationSession {
+        sessions[session.id] = session
+        saveSessions()
+        return session
     }
     
     /**

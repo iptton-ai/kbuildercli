@@ -88,8 +88,7 @@ data class ExecutableTask(
     val toolCalls: List<ToolCall>,
     val dependencies: List<String> = emptyList(),
     val priority: Int = 0,
-    @Serializable(with = DurationSerializer::class)
-    val estimatedDuration: Duration? = null,
+    val estimatedDuration: kotlin.time.Duration? = null,
     val status: TaskStatus = TaskStatus.PENDING
 ) {
     fun withStatus(newStatus: TaskStatus): ExecutableTask {
@@ -134,6 +133,7 @@ data class ExecutionStep(
     val result: ToolResult,
     @Serializable(with = InstantSerializer::class)
     val executedAt: Instant = Instant.now(),
+    @Serializable(with = KotlinDurationSerializer::class)
     val duration: kotlin.time.Duration
 )
 
