@@ -114,13 +114,32 @@ object DefaultToolHandlerFactory {
     
     fun createDefaultHandlers(): List<ToolHandler> {
         return listOf(
+            // File operations
             SaveFileHandler(),
             ViewHandler(),
             StrReplaceEditorHandler(),
+            RemoveFilesHandler(),
+
+            // Analysis tools
             CodebaseRetrievalHandler(),
+            DiagnosticsHandler(),
+
+            // Task management
             TaskManagementHandler(),
             UpdateTasksHandler(),
-            RemoveFilesHandler()
+
+            // Process management
+            LaunchProcessHandler(),
+            ReadTerminalHandler(),
+
+            // Network tools
+            WebSearchHandler(),
+            WebFetchHandler(),
+            OpenBrowserHandler(),
+
+            // Git operations
+            GitHubApiHandler(),
+            GitOperationsHandler()
         )
     }
     
