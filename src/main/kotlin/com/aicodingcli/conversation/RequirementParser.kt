@@ -106,9 +106,11 @@ class DefaultRequirementParser : RequirementParser {
     // Intent detection methods
     private fun isClassCreation(requirement: String): Boolean {
         return (requirement.contains("create") || requirement.contains("generate")) &&
-               (requirement.contains("class") || requirement.contains("interface") || 
-                requirement.contains("entity") || requirement.contains("model")) &&
-               !requirement.contains("api") && !requirement.contains("endpoint")
+               (requirement.contains("class") || requirement.contains("interface") ||
+                requirement.contains("entity") || requirement.contains("model") ||
+                requirement.contains("data class")) &&
+               !requirement.contains("api") && !requirement.contains("endpoint") &&
+               !(requirement.contains("service") && !requirement.contains("class")) // Allow "service class" but exclude standalone "service"
     }
     
     private fun isApiCreation(requirement: String): Boolean {
@@ -119,8 +121,9 @@ class DefaultRequirementParser : RequirementParser {
     
     private fun isConfigCreation(requirement: String): Boolean {
         return (requirement.contains("create") || requirement.contains("generate")) &&
-               (requirement.contains("config") || requirement.contains("properties") || 
-                requirement.contains("settings") || requirement.contains("configuration"))
+               (requirement.contains("config") || requirement.contains("properties") ||
+                requirement.contains("settings") || requirement.contains("configuration")) &&
+               !requirement.contains("class") && !requirement.contains("data class") // Exclude class creation
     }
     
     private fun isTestCreation(requirement: String): Boolean {
@@ -131,7 +134,9 @@ class DefaultRequirementParser : RequirementParser {
     
     private fun isServiceCreation(requirement: String): Boolean {
         return (requirement.contains("create") || requirement.contains("build")) &&
-               (requirement.contains("service") || requirement.contains("microservice"))
+               (requirement.contains("service") || requirement.contains("microservice")) &&
+               !requirement.contains("class") && // Exclude "service class" which should be CREATE_CLASS
+               !requirement.contains("delete") // Exclude refactoring operations
     }
     
     private fun isSystemCreation(requirement: String): Boolean {
@@ -330,7 +335,7 @@ class DefaultRequirementParser : RequirementParser {
         // Extract entity
         val entity = extractEntityName(requirement)
         if (entity != null) {
-            parameters["entity"] = entity
+            parameters["entity"] = entity.replaceFirstChar { it.uppercase() } // Capitalize for forms
         }
         
         // Extract form type
@@ -487,7 +492,7 @@ class DefaultRequirementParser : RequirementParser {
         val entityPatterns = listOf("user", "product", "order", "customer", "item", "account")
         val requirementLower = requirement.lowercase()
 
-        return entityPatterns.find { requirementLower.contains(it) }?.replaceFirstChar { it.uppercase() }
+        return entityPatterns.find { requirementLower.contains(it) } // Return lowercase
     }
     
     private fun extractProperties(requirement: String): List<String> {

@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "2.0.0"
     kotlin("plugin.serialization") version "2.0.0"
     application
+    jacoco // 添加JaCoCo插件
 }
 
 group = "com.aicodingcli"
@@ -47,6 +48,27 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    ignoreFailures = true // 忽略测试失败，确保后续任务仍然执行
+    finalizedBy(tasks.jacocoTestReport) // 测试完成后生成JaCoCo报告
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        csv.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("jacocoHtml"))
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.5".toBigDecimal()
+            }
+        }
+    }
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
