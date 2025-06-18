@@ -50,15 +50,22 @@
 
 ### GitHub Actions 设置
 
-1. **设置 DeepSeek API Token**
+1. **设置必要的 API Token**
 
-   要使用 AutoDev Remote Agent 进行 Issue 智能分析，需要配置 DeepSeek API Token：
+   项目 CI 需要配置以下 API Token：
 
-   - 访问 GitHub 仓库的 "Settings" > "Secrets and variables" > "Actions"
-   - 点击 "New repository secret"
-   - 名称设置为：`DEEPSEEK_TOKEN`
-   - 值设置为你的 DeepSeek API 令牌
-   - 点击 "Add secret" 保存
+   - **DeepSeek API Token**（用于 Issue 智能分析）：
+     - 访问 GitHub 仓库的 "Settings" > "Secrets and variables" > "Actions"
+     - 点击 "New repository secret"
+     - 名称设置为：`DEEPSEEK_TOKEN`
+     - 值设置为你的 DeepSeek API 令牌
+     - 点击 "Add secret" 保存
+     
+   - **Codecov Token**（用于覆盖率报告发布）：
+     - 访问 [Codecov](https://codecov.io/) 并注册/登录
+     - 关联你的 GitHub 仓库
+     - 获取 Codecov token
+     - 在 GitHub 仓库添加名为 `CODECOV_TOKEN` 的仓库密钥
 
 2. **工作流文件**
 
