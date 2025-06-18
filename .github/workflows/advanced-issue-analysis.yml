@@ -46,7 +46,7 @@ jobs:
           fi
 
       - name: Analyze Issue with AutoDev Agent
-        uses: unit-mesh/autodev-remote-agent-action@v0.4.2
+        uses: unit-mesh/autodev-remote-agent-action@v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           deepseek-token: ${{ secrets.DEEPSEEK_TOKEN }}
