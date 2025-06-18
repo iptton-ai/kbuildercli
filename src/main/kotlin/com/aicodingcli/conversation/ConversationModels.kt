@@ -178,7 +178,9 @@ data class ToolMetadata(
     val name: String,
     val description: String,
     val parameters: List<ToolParameter>,
-    val category: String = "general"
+    val category: String = "general",
+    val riskLevel: ToolRiskLevel = ToolRiskLevel.LOW,
+    val examples: List<ToolExample> = emptyList()
 )
 
 /**
@@ -190,8 +192,28 @@ data class ToolParameter(
     val type: String,
     val description: String,
     val required: Boolean = true,
-    val defaultValue: String? = null
+    val defaultValue: String? = null,
+    val examples: List<String> = emptyList()
 )
+
+/**
+ * Tool usage example
+ */
+@Serializable
+data class ToolExample(
+    val description: String,
+    val parameters: Map<String, String>,
+    val expectedResult: String
+)
+
+/**
+ * Risk levels for tools
+ */
+enum class ToolRiskLevel {
+    LOW,        // Safe operations like view, codebase-retrieval
+    MEDIUM,     // File modifications like save-file, str-replace-editor
+    HIGH        // Destructive operations like remove-files, system commands
+}
 
 /**
  * Validation result for operations
