@@ -111,6 +111,18 @@
   - 插件测试框架和验证工具
   - 完整的单元测试覆盖（59个测试）
 
+- [x] 持续对话自动执行引擎 - 2025-06-18 - 52a54c5
+  - 自动执行引擎核心实现（AutoExecutionEngine）
+  - 任务分解器（TaskDecomposer）支持多种需求类型识别
+  - 对话状态管理器（ConversationStateManager）
+  - 工具执行器（ToolExecutor）和工具处理器架构
+  - 需求解析器（RequirementParser）
+  - 支持文件操作工具（save-file、view、str-replace-editor、remove-files）
+  - 支持分析工具（codebase-retrieval、task-management）
+  - 完整的数据模型和序列化支持
+  - 25轮自动执行限制和状态管理
+  - 完整的单元测试覆盖（11个 AutoExecutionEngine 测试）
+
 ## 🚧 进行中
 - [ ] 无
 
